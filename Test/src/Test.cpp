@@ -281,14 +281,14 @@ struct Vector {
 		return Vector(x - v.x, y - v.y, z - v.z, 0);
 	}
 	Vector operator-(const Vector& v) const {
-			return Vector(x - v.x, y - v.y, z - v.z, 0);
-		}
+		return Vector(x - v.x, y - v.y, z - v.z, 0);
+	}
 	float operator*(const Vector& v) { 	// dot product
-		return (x * v.x + y * v.y + z * v.z);
+		return (x * v.x + y * v.y + z * v.z + w * v.w);
 	}
 	float operator*(const Vector& v) const { 	// dot product
-			return (x * v.x + y * v.y + z * v.z);
-		}
+		return (x * v.x + y * v.y + z * v.z);
+	}
 
 	Vector operator%(const Vector& v) { 	// cross product
 		return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x,
@@ -315,12 +315,12 @@ struct Vector {
 		}
 	}
 
-	void homogen(){
-		if(w != 0){
-			x/=fabs(w);
-			y/=fabs(w);
-			z/=fabs(w);
-			w=0;
+	void homogen() {
+		if (w != 0) {
+			x /= fabs(w);
+			y /= fabs(w);
+			z /= fabs(w);
+			w = 0;
 
 		}
 	}
@@ -361,7 +361,6 @@ struct Vector {
 
 		return V;
 	}
-
 
 };
 
@@ -409,7 +408,7 @@ Color WHITE = Color(1.0f, 1.0f, 1.0f);
 const int screenWidth = 600;	// alkalmazÃ¡s ablak felbontÃ¡sa
 const int screenHeight = 600;
 Color image[screenWidth * screenHeight];	// egy alkalmazÃ¡s ablaknyi kÃ©p
-float EPSILON = 0.0001;
+float EPSILON = 0.001;
 int MAX_DEPTH = 5;
 
 //--------------------------------------------------------
@@ -567,9 +566,9 @@ public:
 		lightDirection.Normalize();
 
 		float cosTheta = normalVector * lightDirection;
-//		if (cosTheta < 0)
-//			return reflected;
-		reflected = lightIntense * kd * cosTheta+Color(0.1,0.1,0.1);
+		if (cosTheta < 0)
+			return reflected;
+		reflected = lightIntense * kd * cosTheta + Color(0.1, 0.1, 0.1);
 		Vector halfWay = (viewDirection + lightDirection);
 		halfWay.Normalize();
 		float cosDelta = normalVector * halfWay;
@@ -635,6 +634,22 @@ public:
 	}
 };
 
+Vector multi(myMatrix A, Vector v) {
+
+	float V_a[4] = { 0, 0, 0, 0 };
+	float V_b[4] = { v.x, v.y, v.z, v.w };
+
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++)
+			V_a[i] += ((V_b[j] * (A.M[i][j])));
+	}
+
+	Vector V = Vector(V_a[0], V_a[1], V_a[2], V_a[3]);
+
+	return V;
+
+}
+
 //--------------------------------------------------------
 // Objects
 //--------------------------------------------------------
@@ -642,10 +657,7 @@ public:
 class Intersectable {
 public:
 	Material* material;
-
-
-
-
+	myMatrix quadric;
 
 	Intersectable() {
 		material = new Material();
@@ -656,109 +668,28 @@ public:
 	}
 
 	virtual Hit& intersect(const Ray& ray) {
-		Hit h = Hit();
-		return h;
-	}
-	;
-
-	Material* getMaterial() {
-		return material;
-	}
-
-	virtual ~Intersectable() {
-		delete material;
-	}
-
-};
-
-Vector multi(myMatrix A, Vector v){
-
-		float V_a[4] = { 0, 0, 0, 0 };
-		float V_b[4] = { v.x, v.y, v.z, v.w };
-
-		for (int i = 0; i < 4; i++) {
-			for (int j = 0; j < 4; j++)
-				V_a[i] += ((V_b[j] * (A.M[i][j])));
-		}
-
-		Vector V = Vector(V_a[0], V_a[1], V_a[2], V_a[3]);
-
-		return V;
-
-}
-
-class Sphere: Intersectable {
-public:
-	myMatrix quadric;
-
-	Vector origin;
-		float radius;
-
-
-//	Sphere(Material* m) {
-//		material = m;
-//		quadric = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1);
-//	}
-
-	Sphere(Material* m, Vector o, float rad) {
-		material = m;
-		quadric = myMatrix(4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
-		origin = o;
-		radius = rad;
-	}
-
-	Vector calcNormalVector(Vector intersectPoint) {
-
-		float dx, dy, dz;
-
-//		cout<<"intersect point:"<<endl;
-//		intersectPoint.printOut();
-
-		dx = Vector(1, 0, 0, 0) * quadric * intersectPoint + intersectPoint * quadric * Vector(1, 0, 0, 0);
-		dy = Vector(0,1, 0, 0) * quadric * intersectPoint
-				+ intersectPoint * quadric * Vector(0,1, 0, 0);
-		dz = Vector(0,0,1, 0) * quadric * intersectPoint
-				+ intersectPoint * quadric * Vector(0,0,1, 0);
-
-		return Vector(dx, dy, dz, 0);
-
-//		Vector n;
-//		n=(intersectPoint*quadric)+multi(quadric,intersectPoint);
-//		return n;
-	}
-
-	Hit& intersect(const Ray& ray) {
 		Vector point = ray.startPoin;
 		Vector direction = ray.rayDirection;
 		direction.Normalize();
 		Hit h = Hit();
 
-//
-//
 		Vector a_11 = (direction * quadric);
-				a_11.homogen();
-			float a_1= a_11	* direction;
-//		double b_1 = ((point * quadric) * direction)
-//				+ ((direction * quadric) * point);
-
-			Vector b_11 = (point * quadric);
-			b_11.homogen();
-					float b_1 = (b_11* direction)*2;
-
+		float a_1 = a_11 * direction;
+		Vector b_11 = (point * quadric);
+		float b_1 = (b_11 * direction) * 2;
 		Vector c_11 = (point * quadric);
-		c_11.homogen();
-				float c_1 = c_11* point-1;
+		float c_1 = c_11 * point;
 
-		double discriminant_1 = b_1 * b_1 - 4 *a_1 * c_1;
+		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
 
 		if (discriminant_1 < 0)
 			return h; // visszateres megadasa;
 
 		float sqrt_discriminant_1 = sqrt(discriminant_1);
-//
+		//
 		float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
 		float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
-//
+		//
 		if (t1 < EPSILON)
 			t1 = -EPSILON;
 		if (t2 < EPSILON)
@@ -782,587 +713,322 @@ public:
 		hit.normalVector.Normalize();
 		intersect_counter++;
 
-//		Vector dist = ray.startPoin - origin;
-//		double b = (dist * ray.rayDirection) * 2.0; // másodfokú egyenlet együtthatói
-//		double a = (ray.rayDirection * ray.rayDirection); // a > 0, ezért t1 > t2 lesz
-//		double c = (dist * dist) - radius * radius;
+		return hit;
+	}
 
+	virtual Vector calcNormalVector(Vector intersectPoint) {
 
+		float dx, dy, dz;
 
-//		double discr = b * b - 4.0 * a * c; // diszkrimináns
-//		if(discr>0){
-//			cout<<"dir:"<<endl;
-//			direction.printOut();
-//			cout<<"point:"<<endl;
-//			point.printOut();
-//			cout<<"a_1:"<<a_1<<" a:"<<a<<endl;
-//					cout<<"b_1:"<<b_1<<" b:"<<b<<endl;
-//
-//					cout<<"pAd:"<<(point * quadric) * direction<<endl;
-//					cout<<"dAp:"<<(direction * quadric) * point<<endl;
-//
-//					cout<<"c_1:"<<c_1<<" c:"<<c<<endl;
-//
-//			cout<<"discriminant_1:"<<discriminant_1<<" discriminant:"<<discr<<"\n"<<endl;
-//		}
+		dx = Vector(1, 0, 0, 0) * quadric * intersectPoint
+				+ intersectPoint * quadric * Vector(1, 0, 0, 0);
+		dy = Vector(0, 1, 0, 0) * quadric * intersectPoint
+				+ intersectPoint * quadric * Vector(0, 1, 0, 0);
+		dz = Vector(0, 0, 1, 0) * quadric * intersectPoint
+				+ intersectPoint * quadric * Vector(0, 0, 1, 0);
 
-//		if (discr < 0)
-//			return h; // ha negatív --> nincs megoldás
-//		double sqrt_discr = sqrt(discr);
-//		double t1 = (-b + sqrt_discr) / 2.0 / a; // az egyik sugárparaméter
-//		double t2 = (-b - sqrt_discr) / 2.0 / a; // a másik sugárparaméter
-//		if (t1 < EPSILON)
-//			t1 = -EPSILON; // ha túl közel --> érvénytelen
-//		if (t2 < EPSILON)
-//			t2 = -EPSILON; // ha túl közel --> érvénytelen
-//		if (t1 < 0.0 && t2 < 0.0)
-//			return h;
-//		float t; // a kisebbik pozitív sugárparaméter kiválasztása
-//		if (t1 < 0.0)
-//			return h; // ekkor t2 is kisebb, hiszen t1 > t2
-//		if (t2 > 0.0)
-//			t = t2; // t2 a kisebb a kett˝ o közül
-//		else
-//			t = t1;
+		return Vector(dx, dy, dz, 0);
 
-//		Hit hitrec = Hit();
-//		hitrec.material = material;
-//		hitrec.t = t; // hitRec feltöltése
-//		hitrec.intersectPoint = ray.startPoin + ray.rayDirection * t;
-//		hitrec.normalVector = (hitrec.intersectPoint - origin) / radius;
-//		hitrec.normalVector.Normalize();
-//		intersect_counter++;
+	}
 
+	Material* getMaterial() {
+		return material;
+	}
 
-	return hit;
-}
-
-~Sphere() {
-}
+	virtual ~Intersectable() {
+		delete material;
+	}
 
 };
 
-class Ellipsoid : Intersectable{
-	myMatrix quadric;
+class Sphere: Intersectable {
+public:
+//	myMatrix quadric;
+
+	Sphere(Material* m) {
+		material = m;
+		quadric = myMatrix(4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
+	}
+
+	~Sphere() {
+	}
+
+};
+
+class Ellipsoid: Intersectable {
+//	myMatrix quadric;
 public:
 	Ellipsoid(Material* m) {
-			material = m;
-			quadric = myMatrix(4, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1);
+		material = m;
+		quadric = myMatrix(4, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1);
 	}
-
-	Vector calcNormalVector(Vector intersectPoint) {
-
-			float dx, dy, dz;
-
-	//		cout<<"intersect point:"<<endl;
-	//		intersectPoint.printOut();
-
-			dx = Vector(1, 0, 0, 0) * quadric * intersectPoint + intersectPoint * quadric * Vector(1, 0, 0, 0);
-			dy = Vector(0,1, 0, 0) * quadric * intersectPoint
-					+ intersectPoint * quadric * Vector(0,1, 0, 0);
-			dz = Vector(0,0,1, 0) * quadric * intersectPoint
-					+ intersectPoint * quadric * Vector(0,0,1, 0);
-
-			return Vector(dx, dy, dz, 0);
-
-	//		Vector n;
-	//		n=(intersectPoint*quadric)+multi(quadric,intersectPoint);
-	//		return n;
-		}
-
-		Hit& intersect(const Ray& ray) {
-			Vector point = ray.startPoin;
-			Vector direction = ray.rayDirection;
-			direction.Normalize();
-			Hit h = Hit();
-
-	//
-	//
-			Vector a_11 = (direction * quadric);
-					a_11.homogen();
-				float a_1= a_11	* direction;
-	//		double b_1 = ((point * quadric) * direction)
-	//				+ ((direction * quadric) * point);
-
-				Vector b_11 = (point * quadric);
-				b_11.homogen();
-						float b_1 = (b_11* direction)*2;
-
-			Vector c_11 = (point * quadric);
-			c_11.homogen();
-					float c_1 = c_11* point-1;
-
-			double discriminant_1 = b_1 * b_1 - 4 *a_1 * c_1;
-
-			if (discriminant_1 < 0)
-				return h; // visszateres megadasa;
-
-			float sqrt_discriminant_1 = sqrt(discriminant_1);
-	//
-			float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
-			float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
-	//
-			if (t1 < EPSILON)
-				t1 = -EPSILON;
-			if (t2 < EPSILON)
-				t2 = -EPSILON;
-			if (t1 < 0 && t2 < 0)
-				return h;
-
-			float t;
-			if (t1 < 0)
-				return h;
-			if (t2 > 0)
-				t = t2;
-			else
-				t = t1;
-
-			Hit hit = Hit();
-			hit.material = material;
-			hit.t = t;
-			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
-			hit.normalVector = calcNormalVector(hit.intersectPoint);
-			hit.normalVector.Normalize();
-			intersect_counter++;
-
-	//		Vector dist = ray.startPoin - origin;
-	//		double b = (dist * ray.rayDirection) * 2.0; // másodfokú egyenlet együtthatói
-	//		double a = (ray.rayDirection * ray.rayDirection); // a > 0, ezért t1 > t2 lesz
-	//		double c = (dist * dist) - radius * radius;
-
-
-
-	//		double discr = b * b - 4.0 * a * c; // diszkrimináns
-	//		if(discr>0){
-	//			cout<<"dir:"<<endl;
-	//			direction.printOut();
-	//			cout<<"point:"<<endl;
-	//			point.printOut();
-	//			cout<<"a_1:"<<a_1<<" a:"<<a<<endl;
-	//					cout<<"b_1:"<<b_1<<" b:"<<b<<endl;
-	//
-	//					cout<<"pAd:"<<(point * quadric) * direction<<endl;
-	//					cout<<"dAp:"<<(direction * quadric) * point<<endl;
-	//
-	//					cout<<"c_1:"<<c_1<<" c:"<<c<<endl;
-	//
-	//			cout<<"discriminant_1:"<<discriminant_1<<" discriminant:"<<discr<<"\n"<<endl;
-	//		}
-
-	//		if (discr < 0)
-	//			return h; // ha negatív --> nincs megoldás
-	//		double sqrt_discr = sqrt(discr);
-	//		double t1 = (-b + sqrt_discr) / 2.0 / a; // az egyik sugárparaméter
-	//		double t2 = (-b - sqrt_discr) / 2.0 / a; // a másik sugárparaméter
-	//		if (t1 < EPSILON)
-	//			t1 = -EPSILON; // ha túl közel --> érvénytelen
-	//		if (t2 < EPSILON)
-	//			t2 = -EPSILON; // ha túl közel --> érvénytelen
-	//		if (t1 < 0.0 && t2 < 0.0)
-	//			return h;
-	//		float t; // a kisebbik pozitív sugárparaméter kiválasztása
-	//		if (t1 < 0.0)
-	//			return h; // ekkor t2 is kisebb, hiszen t1 > t2
-	//		if (t2 > 0.0)
-	//			t = t2; // t2 a kisebb a kett˝ o közül
-	//		else
-	//			t = t1;
-
-	//		Hit hitrec = Hit();
-	//		hitrec.material = material;
-	//		hitrec.t = t; // hitRec feltöltése
-	//		hitrec.intersectPoint = ray.startPoin + ray.rayDirection * t;
-	//		hitrec.normalVector = (hitrec.intersectPoint - origin) / radius;
-	//		hitrec.normalVector.Normalize();
-	//		intersect_counter++;
-
-
-		return hit;
-	}
-
 
 };
 
-
-class Cylinder : Intersectable{
-	myMatrix quadric;
+class Cylinder: Intersectable {
+//	myMatrix quadric;
 public:
 	Cylinder(Material* m) {
-			material = m;
-			quadric = myMatrix(4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
+		material = m;
+		quadric = myMatrix(4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
 	}
 
-	Vector calcNormalVector(Vector intersectPoint) {
+	Hit& intersect(const Ray& ray) {
+		Vector point = ray.startPoin;
+		Vector direction = ray.rayDirection;
+		direction.Normalize();
+		Hit h = Hit();
 
-			float dx, dy, dz;
+		Vector a_11 = (direction * quadric);
+		float a_1 = a_11 * direction;
+		Vector b_11 = (point * quadric);
+		float b_1 = (b_11 * direction) * 2;
+		Vector c_11 = (point * quadric);
+		float c_1 = c_11 * point - 1;
 
-	//		cout<<"intersect point:"<<endl;
-	//		intersectPoint.printOut();
+		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
 
-			dx = Vector(1, 0, 0, 0) * quadric * intersectPoint + intersectPoint * quadric * Vector(1, 0, 0, 0);
-			dy = Vector(0,1, 0, 0) * quadric * intersectPoint
-					+ intersectPoint * quadric * Vector(0,1, 0, 0);
-			dz = Vector(0,0,1, 0) * quadric * intersectPoint
-					+ intersectPoint * quadric * Vector(0,0,1, 0);
+		if (discriminant_1 < 0)
+			return h; // visszateres megadasa;
 
-			return Vector(dx, dy, dz, 0);
+		float sqrt_discriminant_1 = sqrt(discriminant_1);
 
-	//		Vector n;
-	//		n=(intersectPoint*quadric)+multi(quadric,intersectPoint);
-	//		return n;
-		}
+		float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
+		float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
 
-		Hit& intersect(const Ray& ray) {
-			Vector point = ray.startPoin;
-			Vector direction = ray.rayDirection;
-			direction.Normalize();
-			Hit h = Hit();
+		if (t1 < EPSILON)
+			t1 = -EPSILON;
+		if (t2 < EPSILON)
+			t2 = -EPSILON;
+		if (t1 < 0 && t2 < 0)
+			return h;
 
-	//
-	//
-			Vector a_11 = (direction * quadric);
-					a_11.homogen();
-				float a_1= a_11	* direction;
-	//		double b_1 = ((point * quadric) * direction)
-	//				+ ((direction * quadric) * point);
+		float t;
+		if (t1 < 0)
+			return h;
+		if (t2 > 0)
+			t = t2;
+		else
+			t = t1;
 
-				Vector b_11 = (point * quadric);
-				b_11.homogen();
-						float b_1 = (b_11* direction)*2;
-
-			Vector c_11 = (point * quadric);
-			c_11.homogen();
-					float c_1 = c_11* point-1;
-
-			double discriminant_1 = b_1 * b_1 - 4 *a_1 * c_1;
-
-			if (discriminant_1 < 0)
-				return h; // visszateres megadasa;
-
-			float sqrt_discriminant_1 = sqrt(discriminant_1);
-	//
-			float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
-			float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
-	//
-			if (t1 < EPSILON)
-				t1 = -EPSILON;
-			if (t2 < EPSILON)
-				t2 = -EPSILON;
-			if (t1 < 0 && t2 < 0)
-				return h;
-
-			float t;
-			if (t1 < 0)
-				return h;
-			if (t2 > 0)
-				t = t2;
-			else
-				t = t1;
-
-			Hit hit = Hit();
-			hit.material = material;
-			hit.t = t;
-			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
-			hit.normalVector = calcNormalVector(hit.intersectPoint);
-			hit.normalVector.Normalize();
-			intersect_counter++;
-
-	//		Vector dist = ray.startPoin - origin;
-	//		double b = (dist * ray.rayDirection) * 2.0; // másodfokú egyenlet együtthatói
-	//		double a = (ray.rayDirection * ray.rayDirection); // a > 0, ezért t1 > t2 lesz
-	//		double c = (dist * dist) - radius * radius;
-
-
-
-	//		double discr = b * b - 4.0 * a * c; // diszkrimináns
-	//		if(discr>0){
-	//			cout<<"dir:"<<endl;
-	//			direction.printOut();
-	//			cout<<"point:"<<endl;
-	//			point.printOut();
-	//			cout<<"a_1:"<<a_1<<" a:"<<a<<endl;
-	//					cout<<"b_1:"<<b_1<<" b:"<<b<<endl;
-	//
-	//					cout<<"pAd:"<<(point * quadric) * direction<<endl;
-	//					cout<<"dAp:"<<(direction * quadric) * point<<endl;
-	//
-	//					cout<<"c_1:"<<c_1<<" c:"<<c<<endl;
-	//
-	//			cout<<"discriminant_1:"<<discriminant_1<<" discriminant:"<<discr<<"\n"<<endl;
-	//		}
-
-	//		if (discr < 0)
-	//			return h; // ha negatív --> nincs megoldás
-	//		double sqrt_discr = sqrt(discr);
-	//		double t1 = (-b + sqrt_discr) / 2.0 / a; // az egyik sugárparaméter
-	//		double t2 = (-b - sqrt_discr) / 2.0 / a; // a másik sugárparaméter
-	//		if (t1 < EPSILON)
-	//			t1 = -EPSILON; // ha túl közel --> érvénytelen
-	//		if (t2 < EPSILON)
-	//			t2 = -EPSILON; // ha túl közel --> érvénytelen
-	//		if (t1 < 0.0 && t2 < 0.0)
-	//			return h;
-	//		float t; // a kisebbik pozitív sugárparaméter kiválasztása
-	//		if (t1 < 0.0)
-	//			return h; // ekkor t2 is kisebb, hiszen t1 > t2
-	//		if (t2 > 0.0)
-	//			t = t2; // t2 a kisebb a kett˝ o közül
-	//		else
-	//			t = t1;
-
-	//		Hit hitrec = Hit();
-	//		hitrec.material = material;
-	//		hitrec.t = t; // hitRec feltöltése
-	//		hitrec.intersectPoint = ray.startPoin + ray.rayDirection * t;
-	//		hitrec.normalVector = (hitrec.intersectPoint - origin) / radius;
-	//		hitrec.normalVector.Normalize();
-	//		intersect_counter++;
-
+		Hit hit = Hit();
+		hit.material = material;
+		hit.t = t;
+		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
+		hit.normalVector = calcNormalVector(hit.intersectPoint);
+		hit.normalVector.Normalize();
+		intersect_counter++;
 
 		return hit;
 	}
-
 
 };
 
-class Paraboloid : Intersectable{
-	myMatrix quadric;
+class Paraboloid: Intersectable {
 public:
 	Paraboloid(Material* m) {
-			material = m;
-			quadric = myMatrix(4, 0, 0, 0,
-							0, 0, 0, 0,
-							0, 0, 4, 0,
-							0, -0.3, 0, 0);
+		material = m;
+		quadric = myMatrix(4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, -0.3, 0, 0);
 	}
 
-	Vector calcNormalVector(Vector intersectPoint) {
+	Hit& intersect(const Ray& ray) {
+		Vector point = ray.startPoin;
+		Vector direction = ray.rayDirection;
+		direction.Normalize();
+		Hit h = Hit();
 
-			float dx, dy, dz;
+		Vector a_11 = (direction * quadric);
+		float a_1 = a_11 * direction;
 
-	//		cout<<"intersect point:"<<endl;
-	//		intersectPoint.printOut();
+		Vector b_11 = (point * quadric);
+		float b_1 = (b_11 * direction) * 2;
 
-			dx = Vector(1, 0, 0, 0) * quadric * intersectPoint + intersectPoint * quadric * Vector(1, 0, 0, 0);
-			dy = Vector(0,1, 0, 0) * quadric * intersectPoint
-					+ intersectPoint * quadric * Vector(0,1, 0, 0);
-			dz = Vector(0,0,1, 0) * quadric * intersectPoint
-					+ intersectPoint * quadric * Vector(0,0,1, 0);
+		Vector c_11 = (point * quadric);
+		float c_1 = c_11 * point - 1;
 
-			return Vector(dx, dy, dz, 0);
+		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
 
-	//		Vector n;
-	//		n=(intersectPoint*quadric)+multi(quadric,intersectPoint);
-	//		return n;
-		}
+		if (discriminant_1 < 0)
+			return h; // visszateres megadasa;
 
-		Hit& intersect(const Ray& ray) {
-			Vector point = ray.startPoin;
-			Vector direction = ray.rayDirection;
-			direction.Normalize();
-			Hit h = Hit();
+		float sqrt_discriminant_1 = sqrt(discriminant_1);
 
-	//
-	//
-			Vector a_11 = (direction * quadric);
-					a_11.homogen();
-				float a_1= a_11	* direction;
-	//		double b_1 = ((point * quadric) * direction)
-	//				+ ((direction * quadric) * point);
+		float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
+		float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
 
-				Vector b_11 = (point * quadric);
-				b_11.homogen();
-						float b_1 = (b_11* direction)*2;
+		if (t1 < EPSILON)
+			t1 = -EPSILON;
+		if (t2 < EPSILON)
+			t2 = -EPSILON;
+		if (t1 < 0 && t2 < 0)
+			return h;
 
-			Vector c_11 = (point * quadric);
-			c_11.homogen();
-					float c_1 = c_11* point-1;
+		float t;
+		if (t1 < 0)
+			return h;
+		if (t2 > 0)
+			t = t2;
+		else
+			t = t1;
 
-			double discriminant_1 = b_1 * b_1 - 4 *a_1 * c_1;
-
-			if (discriminant_1 < 0)
-				return h; // visszateres megadasa;
-
-			float sqrt_discriminant_1 = sqrt(discriminant_1);
-	//
-			float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
-			float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
-	//
-			if (t1 < EPSILON)
-				t1 = -EPSILON;
-			if (t2 < EPSILON)
-				t2 = -EPSILON;
-			if (t1 < 0 && t2 < 0)
-				return h;
-
-			float t;
-			if (t1 < 0)
-				return h;
-			if (t2 > 0)
-				t = t2;
-			else
-				t = t1;
-
-			Hit hit = Hit();
-			hit.material = material;
-			hit.t = t;
-			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
-			hit.normalVector = calcNormalVector(hit.intersectPoint);
-			hit.normalVector.Normalize();
-			intersect_counter++;
-
-	//		Vector dist = ray.startPoin - origin;
-	//		double b = (dist * ray.rayDirection) * 2.0; // másodfokú egyenlet együtthatói
-	//		double a = (ray.rayDirection * ray.rayDirection); // a > 0, ezért t1 > t2 lesz
-	//		double c = (dist * dist) - radius * radius;
-
-
-
-	//		double discr = b * b - 4.0 * a * c; // diszkrimináns
-	//		if(discr>0){
-	//			cout<<"dir:"<<endl;
-	//			direction.printOut();
-	//			cout<<"point:"<<endl;
-	//			point.printOut();
-	//			cout<<"a_1:"<<a_1<<" a:"<<a<<endl;
-	//					cout<<"b_1:"<<b_1<<" b:"<<b<<endl;
-	//
-	//					cout<<"pAd:"<<(point * quadric) * direction<<endl;
-	//					cout<<"dAp:"<<(direction * quadric) * point<<endl;
-	//
-	//					cout<<"c_1:"<<c_1<<" c:"<<c<<endl;
-	//
-	//			cout<<"discriminant_1:"<<discriminant_1<<" discriminant:"<<discr<<"\n"<<endl;
-	//		}
-
-	//		if (discr < 0)
-	//			return h; // ha negatív --> nincs megoldás
-	//		double sqrt_discr = sqrt(discr);
-	//		double t1 = (-b + sqrt_discr) / 2.0 / a; // az egyik sugárparaméter
-	//		double t2 = (-b - sqrt_discr) / 2.0 / a; // a másik sugárparaméter
-	//		if (t1 < EPSILON)
-	//			t1 = -EPSILON; // ha túl közel --> érvénytelen
-	//		if (t2 < EPSILON)
-	//			t2 = -EPSILON; // ha túl közel --> érvénytelen
-	//		if (t1 < 0.0 && t2 < 0.0)
-	//			return h;
-	//		float t; // a kisebbik pozitív sugárparaméter kiválasztása
-	//		if (t1 < 0.0)
-	//			return h; // ekkor t2 is kisebb, hiszen t1 > t2
-	//		if (t2 > 0.0)
-	//			t = t2; // t2 a kisebb a kett˝ o közül
-	//		else
-	//			t = t1;
-
-	//		Hit hitrec = Hit();
-	//		hitrec.material = material;
-	//		hitrec.t = t; // hitRec feltöltése
-	//		hitrec.intersectPoint = ray.startPoin + ray.rayDirection * t;
-	//		hitrec.normalVector = (hitrec.intersectPoint - origin) / radius;
-	//		hitrec.normalVector.Normalize();
-	//		intersect_counter++;
-
+		Hit hit = Hit();
+		hit.material = material;
+		hit.t = t;
+		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
+		hit.normalVector = calcNormalVector(hit.intersectPoint);
+		hit.normalVector.Normalize();
+		intersect_counter++;
 
 		return hit;
 	}
 
+};
+
+class Plane: Intersectable {
+public:
+	Plane(Material* m) {
+		material = m;
+		quadric = myMatrix(0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0.5, 0,
+				0.5);
+	}
+
+	Vector calcNormalVector(Vector intersectPoint) {
+		Vector n = Vector(0, 1, 0);
+		return n;
+	}
+
+	virtual Hit& intersect(const Ray& ray) {
+		Vector point = ray.startPoin;
+		Vector direction = ray.rayDirection;
+		direction.Normalize();
+		Hit h = Hit();
+
+		Vector b_11 = (point * quadric);
+		float b_1 = (b_11 * direction) * 2;
+		Vector c_11 = (point * quadric);
+		float c_1 = c_11 * point;
+
+//				cout<<" b:"<<b_1<<" c_1:"<<c_1<<endl;
+
+		float t = -c_1 / b_1;
+
+		if (t <  EPSILON)
+			t = -EPSILON;
+
+		if (t < 0)
+			return h;
+
+		Hit hit = Hit();
+		hit.material = material;
+		hit.t = t;
+		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
+		hit.normalVector = calcNormalVector(hit.intersectPoint);
+		hit.normalVector.Normalize();
+		intersect_counter++;
+
+		if (hit.intersectPoint.x < -1 || hit.intersectPoint.x > 1
+				|| hit.intersectPoint.z < -8 || hit.intersectPoint.z > 8)
+			return h;
+
+		return hit;
+	}
 
 };
 
 class MyCamera {
-Vector eyePosition;
-Vector lookAtPoint;
-Vector upDirection;
-Vector rightDirection;
-float resolutionX;
-float resolutionY;
+	Vector eyePosition;
+	Vector lookAtPoint;
+	Vector upDirection;
+	Vector rightDirection;
+	float resolutionX;
+	float resolutionY;
 public:
-MyCamera() {
-	eyePosition = lookAtPoint = upDirection = rightDirection = Vector();
-	resolutionX = resolutionY = 0;
-}
+	MyCamera() {
+		eyePosition = lookAtPoint = upDirection = rightDirection = Vector();
+		resolutionX = resolutionY = 0;
+	}
 
-MyCamera(Vector eye, Vector lookat, Vector up) {
-	eyePosition = eye;
-	lookAtPoint = lookat;
-	up.Normalize();
-	upDirection = up;
+	MyCamera(Vector eye, Vector lookat, Vector up) {
+		eyePosition = eye;
+		lookAtPoint = lookat;
+		up.Normalize();
+		upDirection = up;
 
-	Vector ahead = (lookAtPoint - eyePosition);
-	ahead.Normalize();
-	rightDirection = (ahead % upDirection);
-	rightDirection.Normalize();
-	resolutionX = 600;
-	resolutionY = 600;
-}
+		Vector ahead = (lookAtPoint - eyePosition);
+		ahead.Normalize();
+		rightDirection = (ahead % upDirection);
+		rightDirection.Normalize();
+		resolutionX = 600;
+		resolutionY = 600;
+	}
 
-Ray GetRay(float x, float y) {
-	Vector p = lookAtPoint + rightDirection * (2 * x / resolutionX - 1)
-			+ upDirection * (2 * y / resolutionY - 1);
-	Vector dir = p - eyePosition;
-	dir.Normalize();
-	Ray ray = Ray(eyePosition, dir);
-	return ray;
-}
+	Ray GetRay(float x, float y) {
+		Vector p = lookAtPoint + rightDirection * (2 * x / resolutionX - 1)
+				+ upDirection * (2 * y / resolutionY - 1);
+		Vector dir = p - eyePosition;
+		dir.Normalize();
+		Ray ray = Ray(eyePosition, dir);
+		return ray;
+	}
 };
 
 class LightSource {
 public:
-Vector position;
-Color lightRadiation;
+	Vector position;
+	Color lightRadiation;
 
-LightSource(Vector pos, Color intens) {
-	position = pos;
-	lightRadiation = intens;
-}
+	LightSource(Vector pos, Color intens) {
+		position = pos;
+		lightRadiation = intens;
+	}
 
-virtual Color getRadiation() {
-	return lightRadiation;
-}
+	virtual Color getRadiation() {
+		return lightRadiation;
+	}
 
-virtual Vector lightDirection(Vector point) {
-	Vector v = position - point;
-	v.Normalize();
-	return v;
-}
+	virtual Vector lightDirection(Vector point) {
+		Vector v = position - point;
+		v.Normalize();
+		return v;
+	}
 
-virtual ~LightSource() {
+	virtual ~LightSource() {
 
-}
+	}
 
 };
 
 class DirectionalLightSource: LightSource {
 public:
-Vector direction;
+	Vector direction;
 
-DirectionalLightSource(Vector dir, Vector position, Color intense) :
-		LightSource(position, intense) {
-	this->direction = dir;
-}
+	DirectionalLightSource(Vector dir, Vector position, Color intense) :
+			LightSource(position, intense) {
+		this->direction = dir;
+	}
 
-Vector lightDirection(Vector point) {
+	Vector lightDirection(Vector point) {
 
-	return direction;
-}
+		return direction;
+	}
 
 };
 
 class PositionLightSource: LightSource {
 public:
-PositionLightSource(Vector pos, Color intens) :
-		LightSource(pos, intens) {
-}
+	PositionLightSource(Vector pos, Color intens) :
+			LightSource(pos, intens) {
+	}
 
-Vector lightDirection(Vector point) {
-	Vector v = position - point;
-	v.Normalize();
-	return v;
-}
+	Vector lightDirection(Vector point) {
+		Vector v = position - point;
+		v.Normalize();
+		return v;
+	}
 
-Color getRadiation(Vector point) {
-	return lightRadiation / ((point - position) * (point - position));
-}
+	Color getRadiation(Vector point) {
+		return lightRadiation / ((point - position) * (point - position));
+	}
 
 //Color getRadiation(Vector point) {
 //	return lightRadiation;
@@ -1370,158 +1036,159 @@ Color getRadiation(Vector point) {
 };
 
 class Scene {
-Array<Intersectable, 5> objects;
-Array<LightSource, 3> lightSources;
-MyCamera camera;
-Color ambientColor;
+	Array<Intersectable, 5> objects;
+	Array<LightSource, 3> lightSources;
+	MyCamera camera;
+	Color ambientColor;
 public:
-Scene() {
-	objects = Array<Intersectable, 5>();
-	lightSources = Array<LightSource, 3>();
-	camera = MyCamera();
-	ambientColor = Color();
-}
+	Scene() {
+		objects = Array<Intersectable, 5>();
+		lightSources = Array<LightSource, 3>();
+		camera = MyCamera();
+		ambientColor = Color();
+	}
 
-Hit firstIntersect(Ray ray) {
-	Hit hit = Hit();
+	Hit firstIntersect(Ray ray) {
+		Hit hit = Hit();
 
-	float t = -1;
+		float t = -1;
 
-	for (int i = 0; i < objects.SizeOf(); i++) {
+		for (int i = 0; i < objects.SizeOf(); i++) {
 
-		Hit testing = objects[i].intersect(ray);
+			Hit testing = objects[i].intersect(ray);
 
-		if (testing.t > 0 && (testing.t < t || t < 0)) {
-			t = testing.t;
-			hit = testing;
+			if (testing.t > 0 && (testing.t < t || t < 0)) {
+				t = testing.t;
+				hit = testing;
+			}
+		}
+		return hit;
+	}
+
+	Color trace(Ray ray, int depth) {
+		if (depth > MAX_DEPTH)
+			return ambientColor;
+		Hit hit = firstIntersect(ray);
+		if (hit.t < EPSILON)
+			return ambientColor;
+
+		Color outRadiance = Color(0, 0, 0);
+
+		for (int i = 0; i < lightSources.SizeOf(); i++) {
+
+			Ray shadowRay = Ray(hit.intersectPoint+(-0.00001),
+					lightSources[i].lightDirection(hit.intersectPoint)); //Sugar inditasa a metszespontbol a fenyforras fele
+			Hit shadowHit = firstIntersect(shadowRay);
+			Vector pointLightVector = lightSources[i].position
+					- hit.intersectPoint;
+			if (shadowHit.t < 0 || shadowHit.t > pointLightVector.Length()) { // amikor nincsen arnyek
+				outRadiance = hit.material->shade_BRDF(hit.normalVector,
+						-ray.rayDirection, pointLightVector,
+						lightSources[i].getRadiation());
+			}
+		}
+		if (hit.material->isReflective) {
+			Vector reflectionDirection = hit.material->reflect(ray.rayDirection,
+					hit.normalVector);
+			Ray reflectedRay = Ray(hit.intersectPoint + (0.00001),
+					reflectionDirection);
+			outRadiance += trace(reflectedRay, depth + 1)
+					* hit.material->Fresnel(ray.rayDirection, hit.normalVector);
+		}
+		if (hit.material->isRefractive) {
+			Vector reflactionDirection = hit.material->refract(ray.rayDirection,
+					hit.normalVector);
+			Ray reflectedRay = Ray(hit.intersectPoint + EPSILON,
+					reflactionDirection);
+			outRadiance += trace(reflectedRay, depth + 1)
+					* (Color(1, 1, 1)
+							- hit.material->Fresnel(ray.rayDirection,
+									hit.normalVector));
+		}
+		return outRadiance;
+	}
+
+	void writePixel(int x, int y, Color c) {
+		image[y * screenWidth + x] = c;
+	}
+
+	void render() {
+		for (int y = 0; y < screenHeight; y++) {
+			for (int x = 0; x < screenWidth; x++) {
+				Ray ray = camera.GetRay(x, y);
+				Color pixelColor = trace(ray, 0);
+				writePixel(x, y, pixelColor);
+			}
 		}
 	}
-	return hit;
-}
 
-Color trace(Ray ray, int depth) {
-	if (depth > MAX_DEPTH)
-		return ambientColor;
-	Hit hit = firstIntersect(ray);
-	if (hit.t < EPSILON)
-		return ambientColor;
-
-	Color outRadiance = Color(0,0,0);
-
-	for (int i = 0; i < lightSources.SizeOf(); i++) {
-
-		Ray shadowRay = Ray(hit.intersectPoint,
-				lightSources[i].lightDirection(hit.intersectPoint)); //Sugar inditasa a metszespontbol a fenyforras fele
-		Hit shadowHit = firstIntersect(shadowRay);
-		Vector pointLightVector = lightSources[i].position - hit.intersectPoint;
-//		if (shadowHit.t < 0 || shadowHit.t > pointLightVector.Length()) { // amikor nincsen arnyek
-			outRadiance += hit.material->shade_BRDF(hit.normalVector,
-					-ray.rayDirection, pointLightVector,
-					lightSources[i].getRadiation());
-//		}
+	void SetAmbientColor(Color c) {
+		this->ambientColor = c;
 	}
-	if (hit.material->isReflective) {
-		Vector reflectionDirection = hit.material->reflect(ray.rayDirection,
-				hit.normalVector);
-		Ray reflectedRay = Ray(hit.intersectPoint + EPSILON,
-				reflectionDirection);
-		outRadiance += trace(reflectedRay, depth + 1)
-				* hit.material->Fresnel(ray.rayDirection, hit.normalVector);
+
+	void SetCamera(MyCamera & newCam) {
+		this->camera = newCam;
 	}
-	if (hit.material->isRefractive) {
-		Vector reflactionDirection = hit.material->refract(ray.rayDirection,
-				hit.normalVector);
-		Ray reflectedRay = Ray(hit.intersectPoint + EPSILON,
-				reflactionDirection);
-		outRadiance += trace(reflectedRay, depth + 1)
-				* (Color(1,1,1)
-						- hit.material->Fresnel(ray.rayDirection,
-								hit.normalVector));
+
+	void AddObject(Intersectable *newObject) {
+
+		objects.Add(newObject);
 	}
-	return outRadiance;
-}
 
-void writePixel(int x, int y, Color c) {
-	image[y * screenWidth + x] = c;
-}
-
-void render() {
-	for (int y = 0; y < screenHeight; y++) {
-		for (int x = 0; x < screenWidth; x++) {
-			Ray ray = camera.GetRay(x, y);
-			Color pixelColor = trace(ray, 0);
-			writePixel(x, y, pixelColor);
-		}
+	void AddLight(LightSource *newLight) {
+		lightSources.Add(newLight);
 	}
-}
-
-void SetAmbientColor(Color c) {
-	this->ambientColor = c;
-}
-
-void SetCamera(MyCamera & newCam) {
-	this->camera = newCam;
-}
-
-void AddObject(Intersectable *newObject) {
-
-	objects.Add(newObject);
-}
-
-void AddLight(LightSource *newLight) {
-	lightSources.Add(newLight);
-}
 
 };
 
 // Inicializacio, a program futasanak kezdeten, az OpenGL kontextus letrehozasa utan hivodik meg (ld. main() fv.)
 void onInitialization() {
-glViewport(0, 0, screenWidth, screenHeight);
+	glViewport(0, 0, screenWidth, screenHeight);
 
-// Peldakent keszitunk egy kepet az operativ memoriaba
-//	for (int Y = 0; Y < screenHeight; Y++)
-//		for (int X = 0; X < screenWidth; X++)
-//			image[Y * screenWidth + X] = Color((float) X / screenWidth,
-//					(float) Y / screenHeight, 0);
+	Color ks = Color(1, 1, 1);
+	Color kd = Color(255, 215, 0) / 255;
+	Color k = Color(1.1, 1.7, 1.9);
+	Color n = Color(1.17, 1.35, 1.5);
+	Material *material = new Material(ks, kd, n, k, Color(), 50, true, false);
+	Material *material_2 = new Material(ks, Color(205, 127, 50) / 255, n, k,
+			Color(), 50, true, false);
 
-Color ks = Color(1, 1, 1);
-Color kd = Color(255, 215, 0) / 255;
-Color k = Color(3.1, 2.7, 1.9);
-Color n = Color(0.17, 0.35, 1.5);
-Material *material = new Material(ks, kd, n, k, Color(), 50, false, false);
-Sphere *firstSphere = new Sphere(material,Vector(0,0,0), 1);
-Ellipsoid *firstEllipsoid = new Ellipsoid(material);
-Cylinder *firstCylinder = new Cylinder(material);
-Paraboloid *firstParaboloid = new Paraboloid(material);
-Scene scene = Scene();
-scene.AddObject((Intersectable*) firstSphere);
+	Sphere *firstSphere = new Sphere(material);
+	Ellipsoid *firstEllipsoid = new Ellipsoid(material);
+	Cylinder *firstCylinder = new Cylinder(material);
+	Paraboloid *firstParaboloid = new Paraboloid(material);
+	Plane *firstPlane = new Plane(material_2);
+	Scene scene = Scene();
+	scene.AddObject((Intersectable*) firstPlane);
+	scene.AddObject((Intersectable*) firstSphere);
 
-scene.SetAmbientColor(Color(0, 0, 0.5));
+	scene.SetAmbientColor(Color(77, 199, 253)/255);
 
-PositionLightSource *light = new PositionLightSource(Vector(0, 5, 5),
-		Color(1, 1, 1));
+	PositionLightSource *light = new PositionLightSource(Vector(-1, 6, 7),
+			Color(1, 1, 1));
 
-scene.AddLight((LightSource*) light);
+	scene.AddLight((LightSource*) light);
 
-MyCamera camera = MyCamera(Vector(0, 3, 10), Vector(0, 0, 0), Vector(0, 1, 0));
+	MyCamera camera = MyCamera(Vector(0.9, 2, 10), Vector(0, 0, 0),
+			Vector(0, 1, 0));
 
-scene.SetCamera(camera);
+	scene.SetCamera(camera);
 
-scene.render();
+	scene.render();
 
-cout << "intersect counter:" << intersect_counter << endl;
+	cout << "intersect counter:" << intersect_counter << endl;
 
 }
 
 // Rajzolas, ha az alkalmazas ablak ervenytelenne valik, akkor ez a fuggveny hivodik meg
 void onDisplay() {
-glClearColor(0.1f, 0.2f, 0.3f, 1.0f);		// torlesi szin beallitasa
-glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // kepernyo torles
+	glClearColor(0.1f, 0.2f, 0.3f, 1.0f);		// torlesi szin beallitasa
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // kepernyo torles
 
 // ..
 
 // Peldakent atmasoljuk a kepet a rasztertarba
-glDrawPixels(screenWidth, screenHeight, GL_RGB, GL_FLOAT, image);
+	glDrawPixels(screenWidth, screenHeight, GL_RGB, GL_FLOAT, image);
 // Majd rajzolunk egy kek haromszoget
 //	glColor3f(0, 0, 1);
 //	glBegin(GL_TRIANGLES);
@@ -1532,20 +1199,20 @@ glDrawPixels(screenWidth, screenHeight, GL_RGB, GL_FLOAT, image);
 
 // ...
 
-glutSwapBuffers();     				// Buffercsere: rajzolas vege
+	glutSwapBuffers();     				// Buffercsere: rajzolas vege
 
-Vector v = Vector(2, 3, 4, 1);
-myMatrix m = myMatrix(1, 0, 0, 0, 0, 1, 0,0, 0, 0, 1, 0, 0, 0, 0, 1);
-Vector v_1 = v * m;
-Vector v_2 = multi(m,v);
-v_1.printOut();
-v_2.printOut();
+	Vector v = Vector(1, 1, 1, 1);
+	myMatrix m = myMatrix(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1);
+	Vector v_1 = v * m;
+	Vector v_2 = multi(m, v);
+	v_1.printOut();
+	v_2.printOut();
 }
 
 // Billentyuzet esemenyeket lekezelo fuggveny (lenyomas)
 void onKeyboard(unsigned char key, int x, int y) {
-if (key == 'd')
-	glutPostRedisplay(); 		// d beture rajzold ujra a kepet
+	if (key == 'd')
+		glutPostRedisplay(); 		// d beture rajzold ujra a kepet
 
 }
 
@@ -1556,8 +1223,8 @@ void onKeyboardUp(unsigned char key, int x, int y) {
 
 // Eger esemenyeket lekezelo fuggveny
 void onMouse(int button, int state, int x, int y) {
-if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) // A GLUT_LEFT_BUTTON / GLUT_RIGHT_BUTTON illetve GLUT_DOWN / GLUT_UP
-	glutPostRedisplay(); 				// Ilyenkor rajzold ujra a kepet
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) // A GLUT_LEFT_BUTTON / GLUT_RIGHT_BUTTON illetve GLUT_DOWN / GLUT_UP
+		glutPostRedisplay(); 				// Ilyenkor rajzold ujra a kepet
 }
 
 // Eger mozgast lekezelo fuggveny
@@ -1567,7 +1234,7 @@ void onMouseMotion(int x, int y) {
 
 // `Idle' esemenykezelo, jelzi, hogy az ido telik, az Idle esemenyek frekvenciajara csak a 0 a garantalt minimalis ertek
 void onIdle() {
-long time = glutGet(GLUT_ELAPSED_TIME);	// program inditasa ota eltelt ido
+	long time = glutGet(GLUT_ELAPSED_TIME);	// program inditasa ota eltelt ido
 
 }
 
@@ -1576,29 +1243,29 @@ long time = glutGet(GLUT_ELAPSED_TIME);	// program inditasa ota eltelt ido
 
 // A C++ program belepesi pontja, a main fuggvenyt mar nem szabad bantani
 int main(int argc, char **argv) {
-glutInit(&argc, argv); 				// GLUT inicializalasa
-glutInitWindowSize(600, 600); // Alkalmazas ablak kezdeti merete 600x600 pixel
-glutInitWindowPosition(100, 100); // Az elozo alkalmazas ablakhoz kepest hol tunik fel
-glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH); // 8 bites R,G,B,A + dupla buffer + melyseg buffer
+	glutInit(&argc, argv); 				// GLUT inicializalasa
+	glutInitWindowSize(600, 600); // Alkalmazas ablak kezdeti merete 600x600 pixel
+	glutInitWindowPosition(100, 100); // Az elozo alkalmazas ablakhoz kepest hol tunik fel
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH); // 8 bites R,G,B,A + dupla buffer + melyseg buffer
 
-glutCreateWindow("Grafika hazi feladat"); // Alkalmazas ablak megszuletik es megjelenik a kepernyon
+	glutCreateWindow("Grafika hazi feladat"); // Alkalmazas ablak megszuletik es megjelenik a kepernyon
 
-glMatrixMode(GL_MODELVIEW);	// A MODELVIEW transzformaciot egysegmatrixra inicializaljuk
-glLoadIdentity();
-glMatrixMode(GL_PROJECTION);// A PROJECTION transzformaciot egysegmatrixra inicializaljuk
-glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);	// A MODELVIEW transzformaciot egysegmatrixra inicializaljuk
+	glLoadIdentity();
+	glMatrixMode(GL_PROJECTION);// A PROJECTION transzformaciot egysegmatrixra inicializaljuk
+	glLoadIdentity();
 
-onInitialization();			// Az altalad irt inicializalast lefuttatjuk
+	onInitialization();			// Az altalad irt inicializalast lefuttatjuk
 
-glutDisplayFunc(onDisplay);				// Esemenykezelok regisztralasa
-glutMouseFunc(onMouse);
-glutIdleFunc(onIdle);
-glutKeyboardFunc(onKeyboard);
-glutKeyboardUpFunc(onKeyboardUp);
-glutMotionFunc(onMouseMotion);
+	glutDisplayFunc(onDisplay);				// Esemenykezelok regisztralasa
+	glutMouseFunc(onMouse);
+	glutIdleFunc(onIdle);
+	glutKeyboardFunc(onKeyboard);
+	glutKeyboardUpFunc(onKeyboardUp);
+	glutMotionFunc(onMouseMotion);
 
-glutMainLoop();					// Esemenykezelo hurok
+	glutMainLoop();					// Esemenykezelo hurok
 
-return 0;
+	return 0;
 }
 
