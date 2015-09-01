@@ -1,0 +1,1110 @@
+//============================================================================
+// Name        : Test.cpp
+// Author      : 
+// Version     :
+// Copyright   : Your copyright notice
+// Description : Hello World in C++, Ansi-style
+//============================================================================
+
+//=============================================================================================
+// Szamitogepes grafika hazi feladat keret. Ervenyes 2014-tol.
+// A //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// sorokon beluli reszben celszeru garazdalkodni, mert a tobbit ugyis toroljuk.
+// A beadott program csak ebben a fajlban lehet, a fajl 1 byte-os ASCII karaktereket tartalmazhat.
+// Tilos:
+// - mast "beincludolni", illetve mas konyvtarat hasznalni
+// - faljmuveleteket vegezni (printf is fajlmuvelet!)
+// - new operatort hivni az onInitialization fÃ¼ggvÃ©nyt kivÃ©ve, a lefoglalt adat korrekt felszabadÃ­tÃ¡sa nÃ©lkÃ¼l
+// - felesleges programsorokat a beadott programban hagyni
+// - tovabbi kommenteket a beadott programba irni a forrasmegjelolest kommentjeit kiveve
+// ---------------------------------------------------------------------------------------------
+// A feladatot ANSI C++ nyelvu forditoprogrammal ellenorizzuk, a Visual Studio-hoz kepesti elteresekrol
+// es a leggyakoribb hibakrol (pl. ideiglenes objektumot nem lehet referencia tipusnak ertekul adni)
+// a hazibeado portal ad egy osszefoglalot.
+// ---------------------------------------------------------------------------------------------
+// A feladatmegoldasokban csak olyan gl/glu/glut fuggvenyek hasznalhatok, amelyek
+// 1. Az oran a feladatkiadasig elhangzottak ES (logikai AND muvelet)
+// 2. Az alabbi listaban szerepelnek:
+// Rendering pass: glBegin, glVertex[2|3]f, glColor3f, glNormal3f, glTexCoord2f, glEnd, glDrawPixels
+// Transzformaciok: glViewport, glMatrixMode, glLoadIdentity, glMultMatrixf, gluOrtho2D,
+// glTranslatef, glRotatef, glScalef, gluLookAt, gluPerspective, glPushMatrix, glPopMatrix,
+// Illuminacio: glMaterialfv, glMaterialfv, glMaterialf, glLightfv
+// Texturazas: glGenTextures, glBindTexture, glTexParameteri, glTexImage2D, glTexEnvi,
+// Pipeline vezerles: glShadeModel, glEnable/Disable a kovetkezokre:
+// GL_LIGHTING, GL_NORMALIZE, GL_DEPTH_TEST, GL_CULL_FACE, GL_TEXTURE_2D, GL_BLEND, GL_LIGHT[0..7]
+//
+// NYILATKOZAT
+// ---------------------------------------------------------------------------------------------
+// Nev    : <VEZETEKNEV(EK)> <KERESZTNEV(EK)>
+// Neptun : <NEPTUN KOD>
+// ---------------------------------------------------------------------------------------------
+// ezennel kijelentem, hogy a feladatot magam keszitettem, es ha barmilyen segitseget igenybe vettem vagy
+// mas szellemi termeket felhasznaltam, akkor a forrast es az atvett reszt kommentekben egyertelmuen jeloltem.
+// A forrasmegjeloles kotelme vonatkozik az eloadas foliakat es a targy oktatoi, illetve a
+// grafhazi doktor tanacsait kiveve barmilyen csatornan (szoban, irasban, Interneten, stb.) erkezo minden egyeb
+// informaciora (keplet, program, algoritmus, stb.). Kijelentem, hogy a forrasmegjelolessel atvett reszeket is ertem,
+// azok helyessegere matematikai bizonyitast tudok adni. Tisztaban vagyok azzal, hogy az atvett reszek nem szamitanak
+// a sajat kontribucioba, igy a feladat elfogadasarol a tobbi resz mennyisege es minosege alapjan szuletik dontes.
+// Tudomasul veszem, hogy a forrasmegjeloles kotelmenek megsertese eseten a hazifeladatra adhato pontokat
+// negativ elojellel szamoljak el es ezzel parhuzamosan eljaras is indul velem szemben.
+//=============================================================================================
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdlib.h>
+#include <iostream>
+using namespace std;
+#if defined(__APPLE__)
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#include <GLUT/glut.h>
+#else
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
+#include <windows.h>
+#endif
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glut.h>
+#endif
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Innentol modosithatod...
+
+//--------------------------------------------------------
+// Heterogen collection
+//--------------------------------------------------------
+int intersect_counter = 0;
+
+template<class T, int size = 10>
+class Array {
+	T *array[size];
+	int numOfElements;
+	//Array(const Array&);
+	//Array& operator=(const Array &);
+
+public:
+
+	Array() :
+			numOfElements(0) {
+	}
+
+	int SizeOf() {
+		return numOfElements;
+	}
+
+	void Add(T *t) {
+		if (numOfElements >= size) {
+			exit(-1);
+		}
+
+		array[numOfElements++] = t;
+
+	}
+
+	T& operator[](int i) {
+		if (i >= size)
+			exit(-1);
+		return *array[i];
+	}
+};
+
+//--------------------------------------------------------
+// Marix
+//--------------------------------------------------------
+
+struct myMatrix {
+//	A B C D
+//	E F G H
+//	I J K L
+//	M N O P
+
+	float M[4][4];
+
+	myMatrix() {
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				M[i][j] = 0;
+			}
+		}
+	}
+
+	myMatrix(float a, float b, float c, float d, float e, float f, float g,
+			float h, float i, float j) {
+		M[0][0] = a;
+		M[0][1] = b;
+		M[0][2] = c;
+		M[0][3] = d;
+		M[1][0] = b;
+		M[1][1] = e;
+		M[1][2] = f;
+		M[1][3] = g;
+		M[2][0] = c;
+		M[2][1] = f;
+		M[2][2] = h;
+		M[2][3] = i;
+		M[3][0] = d;
+		M[3][1] = g;
+		M[3][2] = i;
+		M[3][3] = j;
+	}
+
+	myMatrix(float a, float b, float c, float d, float e, float f, float g,
+			float h, float i, float j, float k, float l, float m, float n,
+			float o, float p) {
+		M[0][0] = a;
+		M[0][1] = b;
+		M[0][2] = c;
+		M[0][3] = d;
+		M[1][0] = e;
+		M[1][1] = f;
+		M[1][2] = g;
+		M[1][3] = h;
+		M[2][0] = i;
+		M[2][1] = j;
+		M[2][2] = k;
+		M[2][3] = l;
+		M[3][0] = m;
+		M[3][1] = n;
+		M[3][2] = o;
+		M[3][3] = p;
+	}
+
+	myMatrix operator+(const myMatrix & A) {
+		myMatrix B;
+
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				B.M[i][j] = M[i][j] + A.M[i][j];
+			}
+		}
+
+		return B;
+	}
+
+	myMatrix operator*(float f) {
+		myMatrix B;
+
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				B.M[i][j] = M[i][j] * f;
+			}
+		}
+
+		return B;
+	}
+
+	myMatrix operator*(const myMatrix & A) {
+		myMatrix B;
+
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				B.M[i][j] = 0;
+				for (int k = 0; k < 4; k++) {
+					B.M[i][j] = B.M[i][j] + M[i][k] * A.M[k][j];
+				}
+
+			}
+		}
+
+		return B;
+
+	}
+
+	void printM() {
+		for (int i = 0; i < 4; i++) {
+			{
+				cout << M[i][0] << " " << M[i][1] << " " << M[i][2] << " "
+						<< M[i][3] << endl;
+			}
+
+		}
+
+	}
+
+	myMatrix Transp() {
+
+		myMatrix A;
+		A.M[0][0] = M[0][0];
+		A.M[0][1] = M[1][0];
+		A.M[0][2] = M[2][0];
+		A.M[0][3] = M[3][0];
+		A.M[1][0] = M[0][1];
+		A.M[1][1] = M[1][1];
+		A.M[1][2] = M[2][1];
+		A.M[1][3] = M[3][1];
+		A.M[2][0] = M[0][2];
+		A.M[2][1] = M[1][2];
+		A.M[2][2] = M[2][2];
+		A.M[2][3] = M[3][2];
+		A.M[3][0] = M[0][3];
+		A.M[3][1] = M[1][3];
+		A.M[3][2] = M[2][3];
+		A.M[3][3] = M[3][3];
+
+		return A;
+	}
+
+};
+
+//--------------------------------------------------------
+// Vector in homogeneus coordinates
+//--------------------------------------------------------
+
+struct Vector {
+	float x, y, z, w;
+
+	Vector() {
+		x = y = z = w = 0;
+	}
+	Vector(float x0, float y0, float z0 = 0, float w0 = 1) {
+		x = x0;
+		y = y0;
+		z = z0;
+		w = w0;
+	}
+	Vector operator*(float a) {
+		return Vector(x * a, y * a, z * a);
+	}
+	Vector operator*(float a) const {
+		return Vector(x * a, y * a, z * a);
+	}
+	Vector operator/(float a) {
+		return Vector(x / a, y / a, z / a);
+	}
+	Vector operator+(const Vector& v) {
+		return Vector(x + v.x, y + v.y, z + v.z);
+	}
+	Vector operator+(const Vector& v) const {
+		return Vector(x + v.x, y + v.y, z + v.z);
+	}
+	Vector operator-(const Vector& v) {
+		return Vector(x - v.x, y - v.y, z - v.z, 0);
+	}
+	Vector operator-(const Vector& v) const {
+			return Vector(x - v.x, y - v.y, z - v.z, 0);
+		}
+	float operator*(const Vector& v) { 	// dot product
+		return (x * v.x + y * v.y + z * v.z);
+	}
+	float operator*(const Vector& v) const { 	// dot product
+			return (x * v.x + y * v.y + z * v.z);
+		}
+
+	Vector operator%(const Vector& v) { 	// cross product
+		return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x,
+				0);
+	}
+	float Length() {
+		return sqrt(x * x + y * y + z * z);
+	}
+	Vector operator+(float a) {
+		return Vector(x + a, y + a, z + a);
+	}
+
+	void Normalize() {
+		float l = Length();
+		if (l < 0.000001f) {
+			x = 0;
+			y = 0;
+			z = 0;
+		} else {
+			x /= l;
+			y /= l;
+			z /= l;
+			w = 0;
+		}
+	}
+
+	Vector operator-(void) {
+		return Vector(-x, -y, -z);
+	}
+	void operator+=(const Vector& v) {
+		x += v.x;
+		y += v.y;
+		z += v.z;
+	}
+	void operator-=(const Vector& v) {
+		x -= v.x;
+		y -= v.y;
+		z -= v.z;
+	}
+	void operator*=(float f) {
+		x *= f;
+		y *= f;
+		z *= f;
+	}
+
+	void printOut() {
+		cout << "x:" << x << " y:" << y << " z:" << z << " w:" << w << endl;
+	}
+
+	Vector operator*(const myMatrix & A) {
+		float V_a[4] = { 0, 0, 0, 0 };
+		float V_b[4] = { x, y, z, w };
+
+		for (int j = 0; j < 4; j++) {
+			for (int i = 0; i < 4; i++)
+				V_a[j] += ((V_b[i] * (A.M[i][j])));
+		}
+
+		Vector V = Vector(V_a[0], V_a[1], V_a[2], V_a[3]);
+
+		return V;
+	}
+};
+
+//--------------------------------------------------------
+// Spektrum illetve szin
+//--------------------------------------------------------
+struct Color {
+	float r, g, b;
+
+	Color() {
+		r = g = b = 0;
+	}
+	Color(float r0, float g0, float b0) {
+		r = r0;
+		g = g0;
+		b = b0;
+	}
+	Color operator*(float a) {
+		return Color(r * a, g * a, b * a);
+	}
+	Color operator*(const Color& c) {
+		return Color(r * c.r, g * c.g, b * c.b);
+	}
+	Color operator+(const Color& c) {
+		return Color(r + c.r, g + c.g, b + c.b);
+	}
+	Color operator-(const Color& c) {
+		return Color(r - c.r, g - c.g, b - c.b);
+	}
+	Color operator/(const Color& c) {
+		return Color(r / c.r, g / c.g, b / c.b);
+	}
+	Color operator/(float c) {
+		return Color(r / c, g / c, b / c);
+	}
+	void operator+=(const Color& c) {
+		r += c.r;
+		g += c.g;
+		b += c.b;
+	}
+};
+
+Color BLACK = Color(0.0f, 0.0f, 0.0f);
+Color WHITE = Color(1.0f, 1.0f, 1.0f);
+const int screenWidth = 600;	// alkalmazÃ¡s ablak felbontÃ¡sa
+const int screenHeight = 600;
+Color image[screenWidth * screenHeight];	// egy alkalmazÃ¡s ablaknyi kÃ©p
+float EPSILON = 0.0001;
+int MAX_DEPTH = 5;
+
+//--------------------------------------------------------
+// Material with every proterties
+//--------------------------------------------------------
+
+class Material {
+public:
+	Color ka;
+	Color ks;
+	Color kd;
+	Color n;
+	Color k;
+	Color F0;
+	float shininess;
+	bool isReflective;
+	bool isRefractive;
+
+	Material() {
+		ka = ks = kd = n = k = F0 = WHITE;
+		isReflective = isRefractive = false;
+		shininess = 0;
+	}
+
+	Material(Color ks, Color kd, Color n, Color k, Color ka, float shine,
+			bool isReflect, bool isRefract) {
+		this->ka = ka;
+
+		this->ks = ks; //SetSpecColor(ks);
+
+		this->kd = kd; //SetDiffColor(kd);
+		this->n = n;
+		this->k = k;
+		this->shininess = shine;
+		this->isReflective = isReflect;
+		this->isRefractive = isRefract;
+
+	}
+
+	bool isIsReflective() const {
+		return isReflective;
+	}
+
+	void setIsReflective(bool isReflective = false) {
+		this->isReflective = isReflective;
+	}
+
+	bool isIsRefractive() const {
+		return isRefractive;
+	}
+
+	void setIsRefractive(bool isRefractive = false) {
+		this->isRefractive = isRefractive;
+	}
+
+	const Color& getK() const {
+		return k;
+	}
+
+	void setK(const Color& k) {
+		this->k = k;
+	}
+
+	const Color& getKa() const {
+		return ka;
+	}
+
+	void setKa(const Color& ka) {
+		this->ka = ka;
+	}
+
+	const Color& getKd() const {
+		return kd;
+	}
+
+	void setKd(const Color& kd) {
+		this->kd = kd;
+	}
+
+	const Color& getKs() const {
+		return ks;
+	}
+
+	void setKs(const Color& ks) {
+		this->ks = ks;
+	}
+
+	const Color& getN() const {
+		return n;
+	}
+
+	void setN(const Color& n) {
+		this->n = n;
+	}
+
+	float getShine() const {
+		return shininess;
+	}
+
+	void setShine(float shine = 0) {
+		this->shininess = shine;
+	}
+
+	void calcF0() {
+		Color F0 = ((n - WHITE) * (n - WHITE) + k * k)
+				/ ((n + WHITE) * (n + WHITE) + k * k);
+	}
+
+	Color Fresnel(Vector& inDirection, Vector& normalVector) {
+		inDirection.Normalize();
+		normalVector.Normalize();
+		float cosA = fabs(normalVector * inDirection);
+		calcF0();
+		return F0 + (WHITE - F0) * pow(1 - cosA, 5);
+
+	}
+
+	Vector reflect(Vector& inDirection, Vector& normalVector) {
+		return inDirection - normalVector * (normalVector * inDirection) * 2;
+	}
+
+	Vector refract(Vector& inDirection, Vector& normalVector) {
+		inDirection.Normalize();
+		normalVector.Normalize();
+		Vector reflacted;
+		float n[3] = { this->n.r, this->n.g, this->n.b };
+
+		for (int i = 0; i < 3; i++) { // RGB szin komponensekre ki kell szamolni es utana atlagolni?
+			float N = n[i];
+			Vector myNormalVector = normalVector;
+			float cosA = -(myNormalVector * inDirection);
+			if (cosA < 0) {
+				cosA = -cosA;
+				myNormalVector = -normalVector;
+				N = 1 / n[i];
+			}
+			float disc = 1 - (1 - cosA * cosA) / N / N;
+
+			if (disc < 0) {
+				reflacted += reflect(inDirection, myNormalVector);
+				continue;
+			}
+			reflacted += inDirection / N
+					+ myNormalVector * (cosA / N - sqrt(disc));
+		}
+		return reflacted / 3;
+	}
+
+	Color shade_BRDF(Vector normalVector, Vector viewDirection,
+			Vector lightDirection, Color lightIntense) { // diffuz es spekularis tag is benne van.
+		Color reflected = Color();
+
+		normalVector.Normalize();
+		viewDirection.Normalize();
+		lightDirection.Normalize();
+
+		float cosTheta = normalVector * lightDirection;
+		if (cosTheta < 0)
+			return reflected;
+		reflected = lightIntense * kd * cosTheta;
+		Vector halfWay = (viewDirection + lightDirection);
+		halfWay.Normalize();
+		float cosDelta = normalVector * halfWay;
+		if (cosDelta < 0)
+			return reflected;
+		return reflected + lightIntense * ks * pow(cosDelta, shininess);
+
+	}
+
+};
+
+class Gold: Material {
+	Gold() :
+			Material() {
+	}
+	;
+};
+
+class Silver: Material {
+	Silver() :
+			Material() {
+	}
+	;
+};
+
+//--------------------------------------------------------
+// Intersection point
+//--------------------------------------------------------
+
+struct Hit {
+public:
+	float t;
+	Vector intersectPoint; // metszespont
+	Vector normalVector;
+	Material* material;
+
+	Hit() {
+		t = -1;
+		intersectPoint = normalVector = Vector();
+		material = new Material();
+	}
+
+	void operator =(const Hit h) {
+		t = h.t;
+		intersectPoint = h.intersectPoint;
+		normalVector = h.normalVector;
+		material = h.material;
+	}
+
+//	~Hit() {
+//		delete material;
+//	}
+};
+
+class Ray {
+public:
+	Vector startPoin;
+	Vector rayDirection;
+
+	Ray(Vector start, Vector direction) {
+		startPoin = start;
+		rayDirection = direction;
+	}
+};
+
+//--------------------------------------------------------
+// Objects
+//--------------------------------------------------------
+
+class Intersectable {
+public:
+	Material* material;
+
+
+
+
+
+	Intersectable() {
+		material = new Material();
+	}
+
+	Intersectable(Material* m) {
+		material = m;
+	}
+
+	virtual Hit& intersect(const Ray& ray) {
+		Hit h = Hit();
+		return h;
+	}
+	;
+
+	Material* getMaterial() {
+		return material;
+	}
+
+	virtual ~Intersectable() {
+		delete material;
+	}
+
+};
+
+class Sphere: Intersectable {
+public:
+	myMatrix quadric;
+
+	Vector origin;
+		float radius;
+
+
+//	Sphere(Material* m) {
+//		material = m;
+//		quadric = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1);
+//	}
+
+	Sphere(Material* m, Vector o, float rad) {
+		material = m;
+		quadric = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1);
+		origin = o;
+		radius = rad;
+	}
+
+	Vector calcNormalVector(Vector intersectPoint) {
+
+		float dx, dy, dz;
+
+		dx = Vector(intersectPoint.x, 0, 0, 0) * quadric * intersectPoint
+				+ intersectPoint * quadric * Vector(intersectPoint.x, 0, 0, 0);
+		dy = Vector(intersectPoint.y, 0, 0, 0) * quadric * intersectPoint
+				+ intersectPoint * quadric * Vector(intersectPoint.y, 0, 0, 0);
+		dz = Vector(intersectPoint.z, 0, 0, 0) * quadric * intersectPoint
+				+ intersectPoint * quadric * Vector(intersectPoint.z, 0, 0, 0);
+
+		return Vector(dx, dy, dz, 0);
+	}
+
+	Hit& intersect(const Ray& ray) {
+//		Vector point = ray.startPoin;
+//		Vector direction = ray.rayDirection;
+//		direction.Normalize();
+		Hit h = Hit();
+//
+//
+//		float a = (direction * quadric) * direction;
+//		float b = ((point * quadric) * direction)
+//				+ ((direction * quadric) * point);
+//		float c = (point * quadric) * point;
+//
+//		float discriminant = b * b - 4 *a * c;
+//
+//		if (discriminant < 0)
+//			return h; // visszateres megadasa;
+//
+//		float sqrt_discriminant = sqrt(discriminant);
+//
+//		float t1 = (-b + sqrt_discriminant) / 2 / a;
+//		float t2 = (-b - sqrt_discriminant) / 2 / a;
+//
+//		if (t1 < EPSILON)
+//			t1 = -EPSILON;
+//		if (t2 < EPSILON)
+//			t2 = -EPSILON;
+//		if (t1 < 0 && t2 < 0)
+//			return h;
+//
+//		float t;
+//		if (t1 < 0)
+//			return h;
+//		if (t2 > 0)
+//			t = t2;
+//		else
+//			t = t1;
+//
+//		Hit hit = Hit();
+//		hit.material = material;
+//		hit.t = t;
+//		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
+//		hit.normalVector = calcNormalVector(hit.intersectPoint);
+//		hit.normalVector.Normalize();
+//		intersect_counter++;
+
+		Vector dist = ray.startPoin - origin;
+		double b = (dist * ray.rayDirection) * 2.0; // másodfokú egyenlet együtthatói
+		double a = (ray.rayDirection * ray.rayDirection); // a > 0, ezért t1 > t2 lesz
+		double c = (dist * dist) - radius * radius;
+		double discr = b * b - 4.0 * a * c; // diszkrimináns
+		if (discr < 0)
+			return h; // ha negatív --> nincs megoldás
+		double sqrt_discr = sqrt(discr);
+		double t1 = (-b + sqrt_discr) / 2.0 / a; // az egyik sugárparaméter
+		double t2 = (-b - sqrt_discr) / 2.0 / a; // a másik sugárparaméter
+		if (t1 < EPSILON)
+			t1 = -EPSILON; // ha túl közel --> érvénytelen
+		if (t2 < EPSILON)
+			t2 = -EPSILON; // ha túl közel --> érvénytelen
+		if (t1 < 0.0 && t2 < 0.0)
+			return h;
+		float t; // a kisebbik pozitív sugárparaméter kiválasztása
+		if (t1 < 0.0)
+			return h; // ekkor t2 is kisebb, hiszen t1 > t2
+		if (t2 > 0.0)
+			t = t2; // t2 a kisebb a kett˝ o közül
+		else
+			t = t1;
+
+		Hit hitrec = Hit();
+		hitrec.material = material;
+		hitrec.t = t; // hitRec feltöltése
+		hitrec.intersectPoint = ray.startPoin + ray.rayDirection * t;
+		hitrec.normalVector = (hitrec.intersectPoint - origin) / radius;
+		hitrec.normalVector.Normalize();
+
+
+
+	return hitrec;
+}
+
+~Sphere() {
+}
+
+};
+
+class MyCamera {
+Vector eyePosition;
+Vector lookAtPoint;
+Vector upDirection;
+Vector rightDirection;
+float resolutionX;
+float resolutionY;
+public:
+MyCamera() {
+	eyePosition = lookAtPoint = upDirection = rightDirection = Vector();
+	resolutionX = resolutionY = 0;
+}
+
+MyCamera(Vector eye, Vector lookat, Vector up) {
+	eyePosition = eye;
+	lookAtPoint = lookat;
+	up.Normalize();
+	upDirection = up;
+
+	Vector ahead = (lookAtPoint - eyePosition);
+	ahead.Normalize();
+	rightDirection = (ahead % upDirection);
+	rightDirection.Normalize();
+	resolutionX = 600;
+	resolutionY = 600;
+}
+
+Ray GetRay(float x, float y) {
+	Vector p = lookAtPoint + rightDirection * (2 * x / resolutionX - 1)
+			+ upDirection * (2 * y / resolutionY - 1);
+	Vector dir = p - eyePosition;
+	dir.Normalize();
+	Ray ray = Ray(eyePosition, dir);
+	return ray;
+}
+};
+
+class LightSource {
+public:
+Vector position;
+Color lightRadiation;
+
+LightSource(Vector pos, Color intens) {
+	position = pos;
+	lightRadiation = intens;
+}
+
+virtual Color getRadiation() {
+	return lightRadiation;
+}
+
+virtual Vector lightDirection(Vector point) {
+	Vector v = position - point;
+	v.Normalize();
+	return v;
+}
+
+virtual ~LightSource() {
+
+}
+
+};
+
+class DirectionalLightSource: LightSource {
+public:
+Vector direction;
+
+DirectionalLightSource(Vector dir, Vector position, Color intense) :
+		LightSource(position, intense) {
+	this->direction = dir;
+}
+
+Vector lightDirection(Vector point) {
+
+	return direction;
+}
+
+};
+
+class PositionLightSource: LightSource {
+public:
+PositionLightSource(Vector pos, Color intens) :
+		LightSource(pos, intens) {
+}
+
+Vector lightDirection(Vector point) {
+	Vector v = position - point;
+	v.Normalize();
+	return v;
+}
+
+Color getRadiation(Vector point) {
+	return lightRadiation / ((point - position) * (point - position));
+}
+
+//Color getRadiation(Vector point) {
+//	return lightRadiation;
+//}
+};
+
+class Scene {
+Array<Intersectable, 5> objects;
+Array<LightSource, 3> lightSources;
+MyCamera camera;
+Color ambientColor;
+public:
+Scene() {
+	objects = Array<Intersectable, 5>();
+	lightSources = Array<LightSource, 3>();
+	camera = MyCamera();
+	ambientColor = Color();
+}
+
+Hit firstIntersect(Ray ray) {
+	Hit hit = Hit();
+
+	float t = -1;
+
+	for (int i = 0; i < objects.SizeOf(); i++) {
+
+		Hit testing = objects[i].intersect(ray);
+
+		if (testing.t > 0 && (testing.t < t || t < 0)) {
+			t = testing.t;
+			hit = testing;
+		}
+	}
+	return hit;
+}
+
+Color trace(Ray ray, int depth) {
+	if (depth > MAX_DEPTH)
+		return ambientColor;
+	Hit hit = firstIntersect(ray);
+	if (hit.t < EPSILON)
+		return ambientColor;
+
+	Color outRadiance = Color(0,0,0);
+
+	for (int i = 0; i < lightSources.SizeOf(); i++) {
+
+		Ray shadowRay = Ray(hit.intersectPoint,
+				lightSources[i].lightDirection(hit.intersectPoint)); //Sugar inditasa a metszespontbol a fenyforras fele
+		Hit shadowHit = firstIntersect(shadowRay);
+		Vector pointLightVector = lightSources[i].position - hit.intersectPoint;
+		if (shadowHit.t < 0 || shadowHit.t > pointLightVector.Length()) { // amikor nincsen arnyek
+			outRadiance += hit.material->shade_BRDF(hit.normalVector,
+					-ray.rayDirection, pointLightVector,
+					lightSources[i].getRadiation());
+		}
+	}
+	if (hit.material->isReflective) {
+		Vector reflectionDirection = hit.material->reflect(ray.rayDirection,
+				hit.normalVector);
+		Ray reflectedRay = Ray(hit.intersectPoint + EPSILON,
+				reflectionDirection);
+		outRadiance += trace(reflectedRay, depth + 1)
+				* hit.material->Fresnel(ray.rayDirection, hit.normalVector);
+	}
+	if (hit.material->isRefractive) {
+		Vector reflactionDirection = hit.material->refract(ray.rayDirection,
+				hit.normalVector);
+		Ray reflectedRay = Ray(hit.intersectPoint + EPSILON,
+				reflactionDirection);
+		outRadiance += trace(reflectedRay, depth + 1)
+				* (Color(1,1,1)
+						- hit.material->Fresnel(ray.rayDirection,
+								hit.normalVector));
+	}
+	return outRadiance;
+}
+
+void writePixel(int x, int y, Color c) {
+	image[y * screenWidth + x] = c;
+}
+
+void render() {
+	for (int y = 0; y < screenHeight; y++) {
+		for (int x = 0; x < screenWidth; x++) {
+			Ray ray = camera.GetRay(x, y);
+			Color pixelColor = trace(ray, 0);
+			writePixel(x, y, pixelColor);
+		}
+	}
+}
+
+void SetAmbientColor(Color c) {
+	this->ambientColor = c;
+}
+
+void SetCamera(MyCamera & newCam) {
+	this->camera = newCam;
+}
+
+void AddObject(Intersectable *newObject) {
+
+	objects.Add(newObject);
+}
+
+void AddLight(LightSource *newLight) {
+	lightSources.Add(newLight);
+}
+
+};
+
+// Inicializacio, a program futasanak kezdeten, az OpenGL kontextus letrehozasa utan hivodik meg (ld. main() fv.)
+void onInitialization() {
+glViewport(0, 0, screenWidth, screenHeight);
+
+// Peldakent keszitunk egy kepet az operativ memoriaba
+//	for (int Y = 0; Y < screenHeight; Y++)
+//		for (int X = 0; X < screenWidth; X++)
+//			image[Y * screenWidth + X] = Color((float) X / screenWidth,
+//					(float) Y / screenHeight, 0);
+
+Color ks = Color(1, 1, 1);
+Color kd = Color(255, 215, 0) / 255;
+Color k = Color(3.1, 2.7, 1.9);
+Color n = Color(0.17, 0.35, 1.5);
+Material *material = new Material(ks, kd, n, k, Color(), 40, false, false);
+Sphere *firstSphere = new Sphere(material,Vector(0.3,0.1,0), 0.3);
+
+Scene scene = Scene();
+scene.AddObject((Intersectable*) firstSphere);
+
+scene.SetAmbientColor(Color(0, 0, 0.5));
+
+PositionLightSource *light = new PositionLightSource(Vector(0, 5, 5),
+		Color(1, 1, 1));
+
+scene.AddLight((LightSource*) light);
+
+MyCamera camera = MyCamera(Vector(0, 0, 10), Vector(0, 0, 0), Vector(0, 1, 0));
+
+scene.SetCamera(camera);
+
+scene.render();
+
+cout << "intersect counter:" << intersect_counter << endl;
+
+}
+
+// Rajzolas, ha az alkalmazas ablak ervenytelenne valik, akkor ez a fuggveny hivodik meg
+void onDisplay() {
+glClearColor(0.1f, 0.2f, 0.3f, 1.0f);		// torlesi szin beallitasa
+glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // kepernyo torles
+
+// ..
+
+// Peldakent atmasoljuk a kepet a rasztertarba
+glDrawPixels(screenWidth, screenHeight, GL_RGB, GL_FLOAT, image);
+// Majd rajzolunk egy kek haromszoget
+//	glColor3f(0, 0, 1);
+//	glBegin(GL_TRIANGLES);
+//	glVertex2f(-0.2f, -0.2f);
+//	glVertex2f(0.2f, -0.2f);
+//	glVertex2f(0.0f, 0.2f);
+//	glEnd();
+
+// ...
+
+glutSwapBuffers();     				// Buffercsere: rajzolas vege
+
+Vector v = Vector(2, 3, 4, 1);
+myMatrix m = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+Vector v_1 = v * m;
+v_1.printOut();
+}
+
+// Billentyuzet esemenyeket lekezelo fuggveny (lenyomas)
+void onKeyboard(unsigned char key, int x, int y) {
+if (key == 'd')
+	glutPostRedisplay(); 		// d beture rajzold ujra a kepet
+
+}
+
+// Billentyuzet esemenyeket lekezelo fuggveny (felengedes)
+void onKeyboardUp(unsigned char key, int x, int y) {
+
+}
+
+// Eger esemenyeket lekezelo fuggveny
+void onMouse(int button, int state, int x, int y) {
+if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) // A GLUT_LEFT_BUTTON / GLUT_RIGHT_BUTTON illetve GLUT_DOWN / GLUT_UP
+	glutPostRedisplay(); 				// Ilyenkor rajzold ujra a kepet
+}
+
+// Eger mozgast lekezelo fuggveny
+void onMouseMotion(int x, int y) {
+
+}
+
+// `Idle' esemenykezelo, jelzi, hogy az ido telik, az Idle esemenyek frekvenciajara csak a 0 a garantalt minimalis ertek
+void onIdle() {
+long time = glutGet(GLUT_ELAPSED_TIME);	// program inditasa ota eltelt ido
+
+}
+
+// ...Idaig modosithatod
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// A C++ program belepesi pontja, a main fuggvenyt mar nem szabad bantani
+int main(int argc, char **argv) {
+glutInit(&argc, argv); 				// GLUT inicializalasa
+glutInitWindowSize(600, 600); // Alkalmazas ablak kezdeti merete 600x600 pixel
+glutInitWindowPosition(100, 100); // Az elozo alkalmazas ablakhoz kepest hol tunik fel
+glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH); // 8 bites R,G,B,A + dupla buffer + melyseg buffer
+
+glutCreateWindow("Grafika hazi feladat"); // Alkalmazas ablak megszuletik es megjelenik a kepernyon
+
+glMatrixMode(GL_MODELVIEW);	// A MODELVIEW transzformaciot egysegmatrixra inicializaljuk
+glLoadIdentity();
+glMatrixMode(GL_PROJECTION);// A PROJECTION transzformaciot egysegmatrixra inicializaljuk
+glLoadIdentity();
+
+onInitialization();			// Az altalad irt inicializalast lefuttatjuk
+
+glutDisplayFunc(onDisplay);				// Esemenykezelok regisztralasa
+glutMouseFunc(onMouse);
+glutIdleFunc(onIdle);
+glutKeyboardFunc(onKeyboard);
+glutKeyboardUpFunc(onKeyboardUp);
+glutMotionFunc(onMouseMotion);
+
+glutMainLoop();					// Esemenykezelo hurok
+
+return 0;
+}
+

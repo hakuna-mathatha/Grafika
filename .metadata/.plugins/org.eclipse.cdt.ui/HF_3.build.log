@@ -1,0 +1,6 @@
+10:49:47 **** Incremental Build of configuration Default for project HF_3 ****
+make all 
+make: *** No rule to make target `all'.  Stop.
+
+10:49:47 Build Finished (took 529ms)
+
