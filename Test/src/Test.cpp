@@ -112,6 +112,52 @@ public:
 // Marix
 //--------------------------------------------------------
 
+void getMinor(float** source, float** destination, int row, int col,
+		int order) {
+	int colCount = 0;
+	int rowCount = 0;
+
+	for (int i = 0; i < order; i++) {
+		if (i != row) {
+			colCount = 0;
+			for (int j = 0; j < order; j++) {
+				if (j != col) {
+					destination[rowCount][colCount] = source[i][j];
+					colCount++;
+				}
+			}
+			rowCount++;
+		}
+
+	}
+}
+
+float calcDeterminant(float** matrix, int order) {
+	if (order == 1) {
+		return matrix[0][0];
+	}
+
+	float det = 0;
+
+	float** minor = new float*[order - 1];
+	for (int i = 0; i < order - 1; i++) {
+		minor[i] = new float[order - 1];
+	}
+
+	for (int i = 0; i < order; i++) {
+		getMinor(matrix, minor, i, 0, order);
+
+		det += (i % 2 == 1 ? -1 : 1) * matrix[i][0]
+				* calcDeterminant(minor, order - 1);
+	}
+
+	for (int i = 0; i < order - 1; i++)
+		delete[] minor[i];
+	delete[] minor;
+
+	return det;
+}
+
 struct myMatrix {
 //	A B C D
 //	E F G H
@@ -244,6 +290,42 @@ struct myMatrix {
 		return A;
 	}
 
+	myMatrix inverse() {
+		float** matrix = new float*[4];
+		for (int i = 0; i < 4; i++)
+			matrix[i] = new float[4];
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				matrix[i][j] = M[i][j];
+			}
+		}
+
+		myMatrix inverse = myMatrix();
+
+		float** minor = new float*[3];
+		for (int i = 0; i < 3; i++)
+			minor[i] = new float[3];
+
+		float determinant = calcDeterminant(matrix, 4);
+		if (determinant == 0)
+			return inverse;
+
+		for (int j = 0; j < 4; j++) {
+			for (int i = 0; i < 4; i++) {
+				getMinor(matrix, minor, j, i, 4);
+				inverse.M[i][j] = calcDeterminant(minor, 3) / determinant;
+				if ((i + j) % 2 == 1) {
+					inverse.M[i][j] *= (-1);
+
+				}
+			}
+		}
+
+		delete[] matrix;
+		delete[] minor;
+		return inverse;
+	}
+
 };
 
 //--------------------------------------------------------
@@ -349,6 +431,20 @@ struct Vector {
 	}
 
 	Vector operator*(const myMatrix & A) {
+		float V_a[4] = { 0, 0, 0, 0 };
+		float V_b[4] = { x, y, z, w };
+
+		for (int j = 0; j < 4; j++) {
+			for (int i = 0; i < 4; i++)
+				V_a[j] += ((V_b[i] * (A.M[i][j])));
+		}
+
+		Vector V = Vector(V_a[0], V_a[1], V_a[2], V_a[3]);
+
+		return V;
+	}
+
+	Vector operator*(const myMatrix & A) const {
 		float V_a[4] = { 0, 0, 0, 0 };
 		float V_b[4] = { x, y, z, w };
 
@@ -634,7 +730,7 @@ public:
 	}
 };
 
-Vector multi(myMatrix A, Vector v) {
+Vector matrix_vector_multi(myMatrix A, Vector v) {
 
 	float V_a[4] = { 0, 0, 0, 0 };
 	float V_b[4] = { v.x, v.y, v.z, v.w };
@@ -658,6 +754,7 @@ class Intersectable {
 public:
 	Material* material;
 	myMatrix quadric;
+	myMatrix transfom;
 
 	Intersectable() {
 		material = new Material();
@@ -665,12 +762,17 @@ public:
 
 	Intersectable(Material* m) {
 		material = m;
+		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 	}
 
 	virtual Hit& intersect(const Ray& ray) {
-		Vector point = ray.startPoin;
-		Vector direction = ray.rayDirection;
-		direction.Normalize();
+//		Vector point = ray.startPoin;
+//		Vector direction = ray.rayDirection;
+//		direction.Normalize();
+		myMatrix tr_inv = transfom.inverse();
+		Vector point = ray.startPoin * tr_inv;
+		Vector direction = ray.rayDirection * tr_inv;
+//		direction.Normalize();
 		Hit h = Hit();
 
 		Vector a_11 = (direction * quadric);
@@ -708,8 +810,17 @@ public:
 		Hit hit = Hit();
 		hit.material = material;
 		hit.t = t;
-		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
-		hit.normalVector = calcNormalVector(hit.intersectPoint);
+
+		Vector intersectpoint_model = point + (direction * t);
+		Vector transformed_back = intersectpoint_model * transfom;
+
+		myMatrix tr_inv_transp = tr_inv.Transp();
+
+		hit.intersectPoint = transformed_back;
+//		hit.normalVector = calcNormalVector(hit.intersectPoint);
+		hit.normalVector = calcNormalVector(intersectpoint_model)
+				* tr_inv_transp;
+
 		hit.normalVector.Normalize();
 		intersect_counter++;
 
@@ -735,6 +846,10 @@ public:
 		return material;
 	}
 
+	void setTrasformationMatrix(myMatrix transformation) {
+		transfom = transformation;
+	}
+
 	virtual ~Intersectable() {
 		delete material;
 	}
@@ -748,6 +863,8 @@ public:
 	Sphere(Material* m) {
 		material = m;
 		quadric = myMatrix(4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
+		transfom = myMatrix(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, -0.2, 0,
+				-0.9, 1);
 	}
 
 	~Sphere() {
@@ -765,51 +882,39 @@ public:
 
 };
 
-class Cylinder: Intersectable {
-//	myMatrix quadric;
+class Plane: Intersectable {
 public:
-	Cylinder(Material* m) {
+	Plane(Material* m) {
 		material = m;
-		quadric = myMatrix(4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
+		quadric = myMatrix(0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0.5, 0,
+				0.5);
 	}
 
-	Hit& intersect(const Ray& ray) {
+	Vector calcNormalVector(Vector intersectPoint) {
+		Vector n = Vector(0, 1, 0);
+		return n;
+	}
+
+	virtual Hit& intersect(const Ray& ray) {
 		Vector point = ray.startPoin;
 		Vector direction = ray.rayDirection;
 		direction.Normalize();
 		Hit h = Hit();
 
-		Vector a_11 = (direction * quadric);
-		float a_1 = a_11 * direction;
 		Vector b_11 = (point * quadric);
 		float b_1 = (b_11 * direction) * 2;
 		Vector c_11 = (point * quadric);
-		float c_1 = c_11 * point - 1;
+		float c_1 = c_11 * point;
 
-		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
+//				cout<<" b:"<<b_1<<" c_1:"<<c_1<<endl;
 
-		if (discriminant_1 < 0)
-			return h; // visszateres megadasa;
+		float t = -c_1 / b_1;
 
-		float sqrt_discriminant_1 = sqrt(discriminant_1);
+		if (t < EPSILON)
+			t = -EPSILON;
 
-		float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
-		float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
-
-		if (t1 < EPSILON)
-			t1 = -EPSILON;
-		if (t2 < EPSILON)
-			t2 = -EPSILON;
-		if (t1 < 0 && t2 < 0)
+		if (t < 0)
 			return h;
-
-		float t;
-		if (t1 < 0)
-			return h;
-		if (t2 > 0)
-			t = t2;
-		else
-			t = t1;
 
 		Hit hit = Hit();
 		hit.material = material;
@@ -818,6 +923,106 @@ public:
 		hit.normalVector = calcNormalVector(hit.intersectPoint);
 		hit.normalVector.Normalize();
 		intersect_counter++;
+
+		if (hit.intersectPoint.x < -1 || hit.intersectPoint.x > 1
+				|| hit.intersectPoint.z < -8 || hit.intersectPoint.z > 8)
+			return h;
+
+		return hit;
+	}
+
+};
+
+class Cylinder: Intersectable {
+//	myMatrix quadric;
+public:
+	Cylinder(Material* m) {
+		material = m;
+		quadric = myMatrix(6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, -1);
+	}
+
+	bool intersectPoints(const Ray& ray, myMatrix m, float& t1, float& t2) {
+		Vector point = ray.startPoin;
+		Vector direction = ray.rayDirection;
+		direction.Normalize();
+
+		Vector a_11 = (direction * m);
+		float a_1 = a_11 * direction;
+		Vector b_11 = (point * m);
+		float b_1 = (b_11 * direction) * 2;
+		Vector c_11 = (point * m);
+		float c_1 = c_11 * point - 1;
+
+		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
+
+		if (discriminant_1 < 0)
+			return false; // visszateres megadasa;
+
+		float sqrt_discriminant_1 = sqrt(discriminant_1);
+
+		t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
+		t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
+
+//		cout<<"Here: "<<"t1:"<<t1<<" t2:"<<t2<<endl;
+
+		return true;
+	}
+
+	Hit& intersect(const Ray& ray) {
+		Hit h = Hit();
+
+		float t1;
+		float t2;
+
+		bool b = intersectPoints(ray, quadric, t1, t2);
+
+		if (!b)
+			return h;
+
+		if (t1 < EPSILON)
+			t1 = -EPSILON;
+		if (t2 < EPSILON)
+			t2 = -EPSILON;
+		if (t1 < 0 && t2 < 0)
+			return h;
+
+		if (t1 < 0)
+			return h;
+
+		Vector v1 = ray.startPoin + (ray.rayDirection * t1);
+		Vector v2 = ray.startPoin + (ray.rayDirection * t2);
+
+		Hit hit = Hit();
+
+		if (v2.y > 0.6) {
+			if (v1.y > 0.6)
+				return h;
+
+			hit.material = material;
+			hit.t = t1;
+			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t1);
+			hit.normalVector = calcNormalVector(hit.intersectPoint);
+			hit.normalVector.Normalize();
+			hit.normalVector = hit.normalVector * (-1);
+
+		} else {
+			hit.material = material;
+			hit.t = t2;
+			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t2);
+			hit.normalVector = calcNormalVector(hit.intersectPoint);
+			hit.normalVector.Normalize();
+
+		}
+
+//		if (t2 > 0)
+//			t = t2;
+//		else
+//			t = t1;
+
+//		intersect_counter++;
+//
+//		if (hit.intersectPoint.y > 0.6)
+//			return h;
 
 		return hit;
 	}
@@ -878,57 +1083,6 @@ public:
 		hit.normalVector = calcNormalVector(hit.intersectPoint);
 		hit.normalVector.Normalize();
 		intersect_counter++;
-
-		return hit;
-	}
-
-};
-
-class Plane: Intersectable {
-public:
-	Plane(Material* m) {
-		material = m;
-		quadric = myMatrix(0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0, 0.5, 0,
-				0.5);
-	}
-
-	Vector calcNormalVector(Vector intersectPoint) {
-		Vector n = Vector(0, 1, 0);
-		return n;
-	}
-
-	virtual Hit& intersect(const Ray& ray) {
-		Vector point = ray.startPoin;
-		Vector direction = ray.rayDirection;
-		direction.Normalize();
-		Hit h = Hit();
-
-		Vector b_11 = (point * quadric);
-		float b_1 = (b_11 * direction) * 2;
-		Vector c_11 = (point * quadric);
-		float c_1 = c_11 * point;
-
-//				cout<<" b:"<<b_1<<" c_1:"<<c_1<<endl;
-
-		float t = -c_1 / b_1;
-
-		if (t <  EPSILON)
-			t = -EPSILON;
-
-		if (t < 0)
-			return h;
-
-		Hit hit = Hit();
-		hit.material = material;
-		hit.t = t;
-		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
-		hit.normalVector = calcNormalVector(hit.intersectPoint);
-		hit.normalVector.Normalize();
-		intersect_counter++;
-
-		if (hit.intersectPoint.x < -1 || hit.intersectPoint.x > 1
-				|| hit.intersectPoint.z < -8 || hit.intersectPoint.z > 8)
-			return h;
 
 		return hit;
 	}
@@ -1076,7 +1230,7 @@ public:
 
 		for (int i = 0; i < lightSources.SizeOf(); i++) {
 
-			Ray shadowRay = Ray(hit.intersectPoint+(-0.00001),
+			Ray shadowRay = Ray(hit.intersectPoint + (-0.00001),
 					lightSources[i].lightDirection(hit.intersectPoint)); //Sugar inditasa a metszespontbol a fenyforras fele
 			Hit shadowHit = firstIntersect(shadowRay);
 			Vector pointLightVector = lightSources[i].position
@@ -1149,7 +1303,7 @@ void onInitialization() {
 	Color kd = Color(255, 215, 0) / 255;
 	Color k = Color(1.1, 1.7, 1.9);
 	Color n = Color(1.17, 1.35, 1.5);
-	Material *material = new Material(ks, kd, n, k, Color(), 50, true, false);
+	Material *material = new Material(ks, kd, n, k, Color(), 50, false, false);
 	Material *material_2 = new Material(ks, Color(205, 127, 50) / 255, n, k,
 			Color(), 50, true, false);
 
@@ -1162,14 +1316,14 @@ void onInitialization() {
 	scene.AddObject((Intersectable*) firstPlane);
 	scene.AddObject((Intersectable*) firstSphere);
 
-	scene.SetAmbientColor(Color(77, 199, 253)/255);
+	scene.SetAmbientColor(Color(77, 199, 253) / 255);
 
 	PositionLightSource *light = new PositionLightSource(Vector(-1, 6, 7),
 			Color(1, 1, 1));
 
 	scene.AddLight((LightSource*) light);
 
-	MyCamera camera = MyCamera(Vector(0.9, 2, 10), Vector(0, 0, 0),
+	MyCamera camera = MyCamera(Vector(0.9, 3, 10), Vector(0, 0, 0),
 			Vector(0, 1, 0));
 
 	scene.SetCamera(camera);
@@ -1179,6 +1333,16 @@ void onInitialization() {
 	cout << "intersect counter:" << intersect_counter << endl;
 
 }
+
+//void print(float **array, int rows, int cols) {
+//	std::cout << __func__ << std::endl;
+//	for (size_t i = 0; i < rows; ++i) {
+//		std::cout << i << ": ";
+//		for (size_t j = 0; j < cols; ++j)
+//			std::cout << array[i][j] << '\t';
+//		std::cout << std::endl;
+//	}
+//}
 
 // Rajzolas, ha az alkalmazas ablak ervenytelenne valik, akkor ez a fuggveny hivodik meg
 void onDisplay() {
@@ -1203,10 +1367,63 @@ void onDisplay() {
 
 	Vector v = Vector(1, 1, 1, 1);
 	myMatrix m = myMatrix(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1);
-	Vector v_1 = v * m;
-	Vector v_2 = multi(m, v);
-	v_1.printOut();
-	v_2.printOut();
+	myMatrix m2 = myMatrix(1, 0, 0, 2, 0, 4, 0, 4, 0, 0, 4, 9, 0, 0, 0, 1);
+	float** kk = new float*[4];
+	for (int i = 0; i < 4; i++)
+		kk[i] = new float[4];
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			kk[i][j] = m2.M[i][j];
+//			cout<<kk[i][j]<<" ";
+		}
+//		cout<<endl;
+	}
+	float** f1 = new float*[3];
+
+	for (int i = 0; i < 3; i++)
+		f1[i] = new float[3];
+
+//	getMinor(kk, f1, 0, 1, 4);
+
+//	float res = calcDeterminant(kk, 4);
+//	cout << res << endl;
+
+//	myMatrix inv = m2.inverse();
+//	inv.printM();
+//
+//	float i = inv.M[2][3];
+//
+//	cout << i << endl;
+
+//	for(int i =0;i<3;i++){
+//			for(int j=0; j<3;j++){
+//
+//				cout<<f1[i][j]<<" ";
+//			}
+//			cout<<endl;
+//		}
+
+//	cout << m.M[3][3] << endl;
+
+//print(kk, 4, 4);
+
+//	Vector v_1 = v * m;
+//	Vector v_2 = matrix_vector_multi(m, v);
+//	v_1.printOut();
+//	v_2.printOut();
+
+	myMatrix transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+			1);
+	transfom.printM();
+	myMatrix tr_in = transfom.inverse();
+	cout << endl;
+	tr_in.printM();
+
+//	Vector v_2 = matrix_vector_multi(m, v);
+	cout << endl;
+	Vector v_3 = matrix_vector_multi(tr_in, v);
+	v_3.printOut();
+
 }
 
 // Billentyuzet esemenyeket lekezelo fuggveny (lenyomas)
