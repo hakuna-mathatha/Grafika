@@ -506,6 +506,7 @@ const int screenHeight = 600;
 Color image[screenWidth * screenHeight];	// egy alkalmazÃ¡s ablaknyi kÃ©p
 float EPSILON = 0.001;
 int MAX_DEPTH = 5;
+float PI = 3.14159265359;
 
 //--------------------------------------------------------
 // Material with every proterties
@@ -846,7 +847,7 @@ public:
 		return material;
 	}
 
-	void setTrasformationMatrix(myMatrix transformation) {
+	virtual void setTrasformationMatrix(myMatrix transformation) {
 		transfom = transformation;
 	}
 
@@ -863,11 +864,15 @@ public:
 	Sphere(Material* m) {
 		material = m;
 		quadric = myMatrix(4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, -1);
-		transfom = myMatrix(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, -0.2, 0,
-				-0.9, 1);
+		transfom = myMatrix(0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.5, 0, -0.2, 0.1,
+				-0.8, 1);
 	}
 
 	~Sphere() {
+	}
+
+	void setTrasformationMatrix(myMatrix transformation) {
+		transfom = transformation;
 	}
 
 };
@@ -877,7 +882,12 @@ class Ellipsoid: Intersectable {
 public:
 	Ellipsoid(Material* m) {
 		material = m;
-		quadric = myMatrix(4, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1);
+		quadric = myMatrix(4, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1);\
+		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+	}
+
+	void setTrasformationMatrix(myMatrix transformation) {
+		transfom = transformation;
 	}
 
 };
@@ -938,13 +948,16 @@ class Cylinder: Intersectable {
 public:
 	Cylinder(Material* m) {
 		material = m;
-		quadric = myMatrix(6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, -1);
-	}
 
-	bool intersectPoints(const Ray& ray, myMatrix m, float& t1, float& t2) {
-		Vector point = ray.startPoin;
-		Vector direction = ray.rayDirection;
-		direction.Normalize();
+		quadric = myMatrix(6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, -1);
+		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+
+	}
+	bool intersectPoints(Vector point, Vector direction, myMatrix m, float& t1,
+			float& t2) {
+//		myMatrix tr_inv = transfom.inverse();
+//		Vector point = ray.startPoin * tr_inv;
+//		Vector direction = ray.rayDirection * tr_inv;
 
 		Vector a_11 = (direction * m);
 		float a_1 = a_11 * direction;
@@ -973,8 +986,10 @@ public:
 
 		float t1;
 		float t2;
-
-		bool b = intersectPoints(ray, quadric, t1, t2);
+		myMatrix tr_inv = transfom.inverse();
+		Vector point = ray.startPoin * tr_inv;
+		Vector direction = ray.rayDirection * tr_inv;
+		bool b = intersectPoints(point, direction, quadric, t1, t2);
 
 		if (!b)
 			return h;
@@ -989,27 +1004,29 @@ public:
 		if (t1 < 0)
 			return h;
 
-		Vector v1 = ray.startPoin + (ray.rayDirection * t1);
-		Vector v2 = ray.startPoin + (ray.rayDirection * t2);
+		Vector v1 = point + (direction * t1);
+		Vector v2 = point + (direction * t2);
 
+		myMatrix tr_inv_transp = tr_inv.Transp();
 		Hit hit = Hit();
-
-		if (v2.y > 0.6) {
-			if (v1.y > 0.6)
+		hit.material = material;
+		if (v2.y > 0.6 || v2.y < -1) {
+			if (v1.y > 0.6 || v1.y < -1)
 				return h;
+			Vector transformed_back = v1 * transfom;
 
-			hit.material = material;
 			hit.t = t1;
-			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t1);
-			hit.normalVector = calcNormalVector(hit.intersectPoint);
+			hit.intersectPoint = transformed_back;
+			hit.normalVector = calcNormalVector(v1) * tr_inv_transp;
 			hit.normalVector.Normalize();
 			hit.normalVector = hit.normalVector * (-1);
 
-		} else {
-			hit.material = material;
+		} else if (v2.y >= -1) {
+			Vector transformed_back = v2 * transfom;
+
 			hit.t = t2;
-			hit.intersectPoint = ray.startPoin + (ray.rayDirection * t2);
-			hit.normalVector = calcNormalVector(hit.intersectPoint);
+			hit.intersectPoint = transformed_back;
+			hit.normalVector = calcNormalVector(v2) * tr_inv_transp;
 			hit.normalVector.Normalize();
 
 		}
@@ -1027,6 +1044,10 @@ public:
 		return hit;
 	}
 
+	void setTrasformationMatrix(myMatrix transformation) {
+		transfom = transformation;
+	}
+
 };
 
 class Paraboloid: Intersectable {
@@ -1034,6 +1055,7 @@ public:
 	Paraboloid(Material* m) {
 		material = m;
 		quadric = myMatrix(4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, -0.3, 0, 0);
+		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 	}
 
 	Hit& intersect(const Ray& ray) {
@@ -1308,13 +1330,34 @@ void onInitialization() {
 			Color(), 50, true, false);
 
 	Sphere *firstSphere = new Sphere(material);
+//	Ellipsoid implementation-------------------------------------------
 	Ellipsoid *firstEllipsoid = new Ellipsoid(material);
+	myMatrix transfom1 = myMatrix(0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0.3, 0, 0,
+			0, 0, 1);
+	myMatrix transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.3, 0,
+			-3, 1);
+
+	myMatrix transfom2 = myMatrix(cos(M_PI / 6), sin(M_PI / 6), 0, 0,
+			-sin(M_PI / 6), cos(M_PI / 6), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+	firstEllipsoid->setTrasformationMatrix((transfom1*transfom2)*transfom3);
+//	Cylinder implementation---------------------------------------------
 	Cylinder *firstCylinder = new Cylinder(material);
+	transfom1 = myMatrix(0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0.2, 0, 0,
+			0, 0, 1);
+	transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.4, 0,
+			-0.6, 1);
+
+	transfom2 = myMatrix(cos(M_PI / 2), sin(M_PI / 2), 0, 0,
+			-sin(M_PI / 2), cos(M_PI / 2), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+
+	firstCylinder->setTrasformationMatrix((transfom2 * transfom1) * transfom3);
 	Paraboloid *firstParaboloid = new Paraboloid(material);
 	Plane *firstPlane = new Plane(material_2);
 	Scene scene = Scene();
 	scene.AddObject((Intersectable*) firstPlane);
+	scene.AddObject((Intersectable*) firstCylinder);
 	scene.AddObject((Intersectable*) firstSphere);
+	scene.AddObject((Intersectable*) firstEllipsoid);
 
 	scene.SetAmbientColor(Color(77, 199, 253) / 255);
 
@@ -1333,16 +1376,6 @@ void onInitialization() {
 	cout << "intersect counter:" << intersect_counter << endl;
 
 }
-
-//void print(float **array, int rows, int cols) {
-//	std::cout << __func__ << std::endl;
-//	for (size_t i = 0; i < rows; ++i) {
-//		std::cout << i << ": ";
-//		for (size_t j = 0; j < cols; ++j)
-//			std::cout << array[i][j] << '\t';
-//		std::cout << std::endl;
-//	}
-//}
 
 // Rajzolas, ha az alkalmazas ablak ervenytelenne valik, akkor ez a fuggveny hivodik meg
 void onDisplay() {
@@ -1368,49 +1401,6 @@ void onDisplay() {
 	Vector v = Vector(1, 1, 1, 1);
 	myMatrix m = myMatrix(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1);
 	myMatrix m2 = myMatrix(1, 0, 0, 2, 0, 4, 0, 4, 0, 0, 4, 9, 0, 0, 0, 1);
-	float** kk = new float*[4];
-	for (int i = 0; i < 4; i++)
-		kk[i] = new float[4];
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			kk[i][j] = m2.M[i][j];
-//			cout<<kk[i][j]<<" ";
-		}
-//		cout<<endl;
-	}
-	float** f1 = new float*[3];
-
-	for (int i = 0; i < 3; i++)
-		f1[i] = new float[3];
-
-//	getMinor(kk, f1, 0, 1, 4);
-
-//	float res = calcDeterminant(kk, 4);
-//	cout << res << endl;
-
-//	myMatrix inv = m2.inverse();
-//	inv.printM();
-//
-//	float i = inv.M[2][3];
-//
-//	cout << i << endl;
-
-//	for(int i =0;i<3;i++){
-//			for(int j=0; j<3;j++){
-//
-//				cout<<f1[i][j]<<" ";
-//			}
-//			cout<<endl;
-//		}
-
-//	cout << m.M[3][3] << endl;
-
-//print(kk, 4, 4);
-
-//	Vector v_1 = v * m;
-//	Vector v_2 = matrix_vector_multi(m, v);
-//	v_1.printOut();
-//	v_2.printOut();
 
 	myMatrix transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
 			1);
