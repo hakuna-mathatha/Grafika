@@ -610,7 +610,7 @@ public:
 	}
 
 	void calcF0() {
-		Color F0 = ((n - WHITE) * (n - WHITE) + k * k)
+		F0 = ((n - WHITE) * (n - WHITE) + k * k)
 				/ ((n + WHITE) * (n + WHITE) + k * k);
 	}
 
@@ -624,7 +624,12 @@ public:
 	}
 
 	Vector reflect(Vector& inDirection, Vector& normalVector) {
-		return inDirection - normalVector * (normalVector * inDirection) * 2;
+		Vector inDir = inDirection;
+		inDir.Normalize();
+		Vector normVect = normalVector;
+		normVect.Normalize();
+
+		return inDir - normVect * (normVect * inDir) * 2;
 	}
 
 	Vector refract(Vector& inDirection, Vector& normalVector) {
@@ -633,25 +638,23 @@ public:
 		Vector reflacted;
 		float n[3] = { this->n.r, this->n.g, this->n.b };
 
-		for (int i = 0; i < 3; i++) { // RGB szin komponensekre ki kell szamolni es utana atlagolni?
-			float N = n[i];
-			Vector myNormalVector = normalVector;
-			float cosA = -(myNormalVector * inDirection);
-			if (cosA < 0) {
-				cosA = -cosA;
-				myNormalVector = -normalVector;
-				N = 1 / n[i];
-			}
-			float disc = 1 - (1 - cosA * cosA) / N / N;
-
-			if (disc < 0) {
-				reflacted += reflect(inDirection, myNormalVector);
-				continue;
-			}
-			reflacted += inDirection / N
-					+ myNormalVector * (cosA / N - sqrt(disc));
+//		for (int i = 0; i < 3; i++) { // RGB szin komponensekre ki kell szamolni es utana atlagolni?
+		float N = this->n.r;
+		Vector myNormalVector = normalVector;
+		float cosA = -(myNormalVector * inDirection);
+		if (cosA < 0) {
+			cosA = -cosA;
+			myNormalVector = normalVector * (-1);
+			N = 1 / N;
 		}
-		return reflacted / 3;
+		float disc = 1 - (1 - cosA * cosA) / N / N;
+
+		if (disc < 0) {
+			return reflect(inDirection, myNormalVector);
+		}
+		reflacted = inDirection / N + myNormalVector * (cosA / N - sqrt(disc));
+//		}
+		return reflacted;
 	}
 
 	Color shade_BRDF(Vector normalVector, Vector viewDirection,
@@ -665,7 +668,7 @@ public:
 		float cosTheta = normalVector * lightDirection;
 		if (cosTheta < 0)
 			return reflected;
-		reflected = lightIntense * kd * cosTheta + Color(0.1, 0.1, 0.1);
+		reflected = lightIntense * kd * cosTheta;
 		Vector halfWay = (viewDirection + lightDirection);
 		halfWay.Normalize();
 		float cosDelta = normalVector * halfWay;
@@ -875,22 +878,89 @@ public:
 		transfom = transformation;
 	}
 
+
+
 };
 
 class Ellipsoid: Intersectable {
 //	myMatrix quadric;
 public:
+	static int num_of_element;
+	Vector y_axis;
+	Ellipsoid next_element;
 	Ellipsoid(Material* m) {
+		y_axis = Vector(0, 1, 0, 0);
 		material = m;
 		quadric = myMatrix(4, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1);\
 		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+
 	}
 
 	void setTrasformationMatrix(myMatrix transformation) {
 		transfom = transformation;
 	}
 
+	Hit& intersect(const Ray& ray) {
+
+		myMatrix tr_inv = transfom.inverse();
+		Vector point = ray.startPoin * tr_inv;
+		Vector direction = ray.rayDirection * tr_inv;
+		Hit h = Hit();
+
+		Vector a_11 = (direction * quadric);
+		float a_1 = a_11 * direction;
+		Vector b_11 = (point * quadric);
+		float b_1 = (b_11 * direction) * 2;
+		Vector c_11 = (point * quadric);
+		float c_1 = c_11 * point;
+
+		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
+
+		if (discriminant_1 < 0)
+			return h; // visszateres megadasa;
+
+		float sqrt_discriminant_1 = sqrt(discriminant_1);
+		//
+		float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
+		float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
+		//
+		if (t1 < EPSILON)
+			t1 = -EPSILON;
+		if (t2 < EPSILON)
+			t2 = -EPSILON;
+		if (t1 < 0 && t2 < 0)
+			return h;
+
+		float t;
+		if (t1 < 0)
+			return h;
+		if (t2 > 0)
+			t = t2;
+		else
+			t = t1;
+
+		Hit hit = Hit();
+		hit.material = material;
+		hit.t = t;
+
+		Vector intersectpoint_model = point + (direction * t);
+		Vector transformed_back = intersectpoint_model * transfom;
+
+		myMatrix tr_inv_transp = tr_inv.Transp();
+
+		hit.intersectPoint = transformed_back;
+		hit.normalVector = calcNormalVector(intersectpoint_model)
+				* tr_inv_transp;
+
+		hit.normalVector.Normalize();
+		intersect_counter++;
+
+		return hit;
+	}
+
 };
+
+int Ellipsoid::num_of_element = 0;
 
 class Plane: Intersectable {
 public:
@@ -943,6 +1013,57 @@ public:
 
 };
 
+class Plane2: Intersectable {
+public:
+	Plane2(Material* m) {
+		material = m;
+		quadric = myMatrix(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0.5,
+				0.5);
+	}
+
+	Vector calcNormalVector(Vector intersectPoint) {
+		Vector n = Vector(0, 1, 0);
+		return n;
+	}
+
+	virtual Hit& intersect(const Ray& ray) {
+		Vector point = ray.startPoin;
+		Vector direction = ray.rayDirection;
+		direction.Normalize();
+		Hit h = Hit();
+
+		Vector b_11 = (point * quadric);
+		float b_1 = (b_11 * direction) * 2;
+		Vector c_11 = (point * quadric);
+		float c_1 = c_11 * point;
+
+//				cout<<" b:"<<b_1<<" c_1:"<<c_1<<endl;
+
+		float t = -c_1 / b_1;
+
+		if (t < EPSILON)
+			t = -EPSILON;
+
+		if (t < 0)
+			return h;
+
+		Hit hit = Hit();
+		hit.material = material;
+		hit.t = t;
+		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
+		hit.normalVector = calcNormalVector(hit.intersectPoint);
+		hit.normalVector.Normalize();
+		intersect_counter++;
+
+		if (hit.intersectPoint.x < -0.5 || hit.intersectPoint.x > 0.5
+				|| hit.intersectPoint.y < -0.5 || hit.intersectPoint.y > 0.5)
+			return h;
+
+		return hit;
+	}
+
+};
+
 class Cylinder: Intersectable {
 //	myMatrix quadric;
 public:
@@ -955,9 +1076,6 @@ public:
 	}
 	bool intersectPoints(Vector point, Vector direction, myMatrix m, float& t1,
 			float& t2) {
-//		myMatrix tr_inv = transfom.inverse();
-//		Vector point = ray.startPoin * tr_inv;
-//		Vector direction = ray.rayDirection * tr_inv;
 
 		Vector a_11 = (direction * m);
 		float a_1 = a_11 * direction;
@@ -975,8 +1093,6 @@ public:
 
 		t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
 		t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
-
-//		cout<<"Here: "<<"t1:"<<t1<<" t2:"<<t2<<endl;
 
 		return true;
 	}
@@ -1031,16 +1147,6 @@ public:
 
 		}
 
-//		if (t2 > 0)
-//			t = t2;
-//		else
-//			t = t1;
-
-//		intersect_counter++;
-//
-//		if (hit.intersectPoint.y > 0.6)
-//			return h;
-
 		return hit;
 	}
 
@@ -1054,34 +1160,46 @@ class Paraboloid: Intersectable {
 public:
 	Paraboloid(Material* m) {
 		material = m;
-		quadric = myMatrix(4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, -0.3, 0, 0);
+		quadric = myMatrix(1, 0, 0, 0, 0, 0, 0, -0.5, 0, 0, 1, 0, 0, -0.5, 0,
+				0);
 		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 	}
 
-	Hit& intersect(const Ray& ray) {
-		Vector point = ray.startPoin;
-		Vector direction = ray.rayDirection;
-		direction.Normalize();
-		Hit h = Hit();
+	bool intersectPoints(Vector point, Vector direction, myMatrix m, float& t1,
+			float& t2) {
 
-		Vector a_11 = (direction * quadric);
+		Vector a_11 = (direction * m);
 		float a_1 = a_11 * direction;
-
-		Vector b_11 = (point * quadric);
+		Vector b_11 = (point * m);
 		float b_1 = (b_11 * direction) * 2;
-
-		Vector c_11 = (point * quadric);
+		Vector c_11 = (point * m);
 		float c_1 = c_11 * point - 1;
 
 		double discriminant_1 = b_1 * b_1 - 4 * a_1 * c_1;
 
 		if (discriminant_1 < 0)
-			return h; // visszateres megadasa;
+			return false; // visszateres megadasa;
 
 		float sqrt_discriminant_1 = sqrt(discriminant_1);
 
-		float t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
-		float t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
+		t1 = (-b_1 + sqrt_discriminant_1) / 2 / a_1;
+		t2 = (-b_1 - sqrt_discriminant_1) / 2 / a_1;
+
+		return true;
+	}
+
+	Hit& intersect(const Ray& ray) {
+		Hit h = Hit();
+
+		float t1;
+		float t2;
+		myMatrix tr_inv = transfom.inverse();
+		Vector point = ray.startPoin * tr_inv;
+		Vector direction = ray.rayDirection * tr_inv;
+		bool b = intersectPoints(point, direction, quadric, t1, t2);
+
+		if (!b)
+			return h;
 
 		if (t1 < EPSILON)
 			t1 = -EPSILON;
@@ -1093,20 +1211,40 @@ public:
 		float t;
 		if (t1 < 0)
 			return h;
-		if (t2 > 0)
-			t = t2;
-		else
-			t = t1;
 
+		Vector v1 = point + (direction * t1);
+		Vector v2 = point + (direction * t2);
+
+		myMatrix tr_inv_transp = tr_inv.Transp();
 		Hit hit = Hit();
 		hit.material = material;
-		hit.t = t;
-		hit.intersectPoint = ray.startPoin + (ray.rayDirection * t);
-		hit.normalVector = calcNormalVector(hit.intersectPoint);
-		hit.normalVector.Normalize();
-		intersect_counter++;
+
+		if (v2.y > 0.6) {
+			if (v1.y > 0.6)
+				return h;
+			Vector transformed_back = v1 * transfom;
+
+			hit.t = t1;
+			hit.intersectPoint = transformed_back;
+			hit.normalVector = calcNormalVector(v1) * tr_inv_transp;
+			hit.normalVector.Normalize();
+			hit.normalVector = hit.normalVector * (-1);
+
+		} else if (v2.y >= -1) {
+			Vector transformed_back = v2 * transfom;
+
+			hit.t = t2;
+			hit.intersectPoint = transformed_back;
+			hit.normalVector = calcNormalVector(v2) * tr_inv_transp;
+			hit.normalVector.Normalize();
+
+		}
 
 		return hit;
+	}
+
+	void setTrasformationMatrix(myMatrix transformation) {
+		transfom = transformation;
 	}
 
 };
@@ -1258,7 +1396,7 @@ public:
 			Vector pointLightVector = lightSources[i].position
 					- hit.intersectPoint;
 			if (shadowHit.t < 0 || shadowHit.t > pointLightVector.Length()) { // amikor nincsen arnyek
-				outRadiance = hit.material->shade_BRDF(hit.normalVector,
+				outRadiance += hit.material->shade_BRDF(hit.normalVector,
 						-ray.rayDirection, pointLightVector,
 						lightSources[i].getRadiation());
 			}
@@ -1274,10 +1412,10 @@ public:
 		if (hit.material->isRefractive) {
 			Vector reflactionDirection = hit.material->refract(ray.rayDirection,
 					hit.normalVector);
-			Ray reflectedRay = Ray(hit.intersectPoint + EPSILON,
+			Ray reflectedRay = Ray(hit.intersectPoint + (0.00001),
 					reflactionDirection);
 			outRadiance += trace(reflectedRay, depth + 1)
-					* (Color(1, 1, 1)
+					* (WHITE
 							- hit.material->Fresnel(ray.rayDirection,
 									hit.normalVector));
 		}
@@ -1321,43 +1459,61 @@ public:
 void onInitialization() {
 	glViewport(0, 0, screenWidth, screenHeight);
 
-	Color ks = Color(1, 1, 1);
+	Color ks = Color(0.5, 0.5, 0.5);
 	Color kd = Color(255, 215, 0) / 255;
-	Color k = Color(1.1, 1.7, 1.9);
-	Color n = Color(1.17, 1.35, 1.5);
-	Material *material = new Material(ks, kd, n, k, Color(), 50, false, false);
+	Color k = Color(3.1, 2.7, 1.9);
+	Color k_1 = Color(1.1, 1.7, 0.9);
+	Color n = Color(0.17, 0.35, 1.5);
+	Material *material = new Material(ks, Color(255, 200, 50) / 255, n, k,
+			Color(), 50, false, false);
 	Material *material_2 = new Material(ks, Color(205, 127, 50) / 255, n, k,
+			Color(), 50, false, false);
+	Material *material_3 = new Material(ks, Color(0, 178, 89) / 255, n, k,
 			Color(), 50, true, false);
 
-	Sphere *firstSphere = new Sphere(material);
+	Material *material_4 = new Material(ks, Color(0, 144, 244) / 255,
+			Color(1.5, 1.5, 1.5), Color(), Color(), 50, false, true);
+//	Sphere implementation----------------------------------------------
+	Sphere *firstSphere = new Sphere(material_4);
+
 //	Ellipsoid implementation-------------------------------------------
 	Ellipsoid *firstEllipsoid = new Ellipsoid(material);
 	myMatrix transfom1 = myMatrix(0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0.3, 0, 0,
 			0, 0, 1);
-	myMatrix transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.3, 0,
-			-3, 1);
-
+	myMatrix transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.2, 0,
+			0.5, 1);
 	myMatrix transfom2 = myMatrix(cos(M_PI / 6), sin(M_PI / 6), 0, 0,
 			-sin(M_PI / 6), cos(M_PI / 6), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-	firstEllipsoid->setTrasformationMatrix((transfom1*transfom2)*transfom3);
+	myMatrix transform4 = myMatrix(0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0.3, 0.2,
+			1, 1);
+	firstEllipsoid->setTrasformationMatrix(transfom1 * transform4);
+
 //	Cylinder implementation---------------------------------------------
 	Cylinder *firstCylinder = new Cylinder(material);
-	transfom1 = myMatrix(0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0.2, 0, 0,
-			0, 0, 1);
-	transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.4, 0,
-			-0.6, 1);
+	transfom1 = myMatrix(0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 1);
+	transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.4, 0, -0.6, 1);
+	transfom2 = myMatrix(cos(M_PI / 2), sin(M_PI / 2), 0, 0, -sin(M_PI / 2),
+			cos(M_PI / 2), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+	firstCylinder->setTrasformationMatrix((transfom1 * transfom2) * transfom3);
 
-	transfom2 = myMatrix(cos(M_PI / 2), sin(M_PI / 2), 0, 0,
-			-sin(M_PI / 2), cos(M_PI / 2), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+//	Paraboloid implemenation--------------------------------------------
+	Paraboloid *firstParaboloid = new Paraboloid(material_4);
+	transfom1 = myMatrix(0.2, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.2, 0, 0, 0, 0, 1);
+	transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.4, 0, -0.6, 1);
+	transfom2 = myMatrix(cos(M_PI / 2), sin(M_PI / 2), 0, 0, -sin(M_PI / 2),
+			cos(M_PI / 2), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+	firstParaboloid->setTrasformationMatrix((transfom1) * transfom3);
 
-	firstCylinder->setTrasformationMatrix((transfom2 * transfom1) * transfom3);
-	Paraboloid *firstParaboloid = new Paraboloid(material);
+//	Plane implementation------------------------------------------------
 	Plane *firstPlane = new Plane(material_2);
+	Plane2 *secondPlane = new Plane2(material_2);
 	Scene scene = Scene();
 	scene.AddObject((Intersectable*) firstPlane);
-	scene.AddObject((Intersectable*) firstCylinder);
-	scene.AddObject((Intersectable*) firstSphere);
+//	scene.AddObject((Intersectable*) firstCylinder);
+//	scene.AddObject((Intersectable*) firstSphere);
 	scene.AddObject((Intersectable*) firstEllipsoid);
+//	scene.AddObject((Intersectable*) secondPlane);
+//	scene.AddObject((Intersectable*) firstParaboloid);
 
 	scene.SetAmbientColor(Color(77, 199, 253) / 255);
 
@@ -1366,7 +1522,7 @@ void onInitialization() {
 
 	scene.AddLight((LightSource*) light);
 
-	MyCamera camera = MyCamera(Vector(0.9, 3, 10), Vector(0, 0, 0),
+	MyCamera camera = MyCamera(Vector(0.9, 2, 5), Vector(0, 0, 0),
 			Vector(0, 1, 0));
 
 	scene.SetCamera(camera);
