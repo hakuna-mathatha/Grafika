@@ -1,46 +1,53 @@
-16:57:50 **** Incremental Build of configuration Debug for project Test ****
+01:11:34 **** Incremental Build of configuration Debug for project Test ****
 Info: Internal Builder is used for build
 g++ "-IC:\\MinGW\\include\\GL" -O0 -g3 -Wall -c -fmessage-length=0 -o "src\\Test.o" "..\\src\\Test.cpp" 
 ..\src\Test.cpp: In member function 'Vector Material::refract(Vector&, Vector&)':
 ..\src\Test.cpp:639:9: warning: unused variable 'n' [-Wunused-variable]
 ..\src\Test.cpp: In member function 'virtual Hit& Intersectable::intersect(const Ray&)':
-..\src\Test.cpp:781:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:781:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:781:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:815:7: warning: reference to local variable 'hit' returned [enabled by default]
+..\src\Test.cpp:780:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:780:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:780:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:814:7: warning: reference to local variable 'hit' returned [enabled by default]
+..\src\Test.cpp: In member function 'virtual Hit& Ellipsoid::intersect(const Ray&)':
+..\src\Test.cpp:906:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:906:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:906:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:940:7: warning: reference to local variable 'hit' returned [enabled by default]
 ..\src\Test.cpp: In member function 'virtual Hit& Plane::intersect(const Ray&)':
-..\src\Test.cpp:916:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:916:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:933:7: warning: reference to local variable 'hit' returned [enabled by default]
+..\src\Test.cpp:1013:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1013:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1030:7: warning: reference to local variable 'hit' returned [enabled by default]
 ..\src\Test.cpp: In member function 'virtual Hit& Plane2::intersect(const Ray&)':
-..\src\Test.cpp:967:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:967:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:984:7: warning: reference to local variable 'hit' returned [enabled by default]
+..\src\Test.cpp:1064:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1064:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1081:7: warning: reference to local variable 'hit' returned [enabled by default]
 ..\src\Test.cpp: In member function 'virtual Hit& Cylinder::intersect(const Ray&)':
-..\src\Test.cpp:1035:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1035:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1035:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1035:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1061:7: warning: reference to local variable 'hit' returned [enabled by default]
+..\src\Test.cpp:1132:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1132:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1132:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1132:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1158:7: warning: reference to local variable 'hit' returned [enabled by default]
 ..\src\Test.cpp: In member function 'virtual Hit& Paraboloid::intersect(const Ray&)':
-..\src\Test.cpp:1126:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1126:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1126:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1126:7: warning: reference to local variable 'h' returned [enabled by default]
-..\src\Test.cpp:1153:7: warning: reference to local variable 'hit' returned [enabled by default]
-..\src\Test.cpp:1145:9: warning: unused variable 't' [-Wunused-variable]
+..\src\Test.cpp:1223:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1223:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1223:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1223:7: warning: reference to local variable 'h' returned [enabled by default]
+..\src\Test.cpp:1250:7: warning: reference to local variable 'hit' returned [enabled by default]
+..\src\Test.cpp:1242:9: warning: unused variable 't' [-Wunused-variable]
 ..\src\Test.cpp: In function 'void onInitialization()':
-..\src\Test.cpp:1397:8: warning: variable 'kd' set but not used [-Wunused-but-set-variable]
-..\src\Test.cpp:1399:8: warning: variable 'k_1' set but not used [-Wunused-but-set-variable]
-..\src\Test.cpp:1405:12: warning: unused variable 'material_3' [-Wunused-variable]
-..\src\Test.cpp:1411:10: warning: unused variable 'firstSphere' [-Wunused-variable]
-..\src\Test.cpp:1442:10: warning: unused variable 'secondPlane' [-Wunused-variable]
+..\src\Test.cpp:1509:8: warning: variable 'kd' set but not used [-Wunused-but-set-variable]
+..\src\Test.cpp:1511:8: warning: variable 'k_1' set but not used [-Wunused-but-set-variable]
+..\src\Test.cpp:1517:12: warning: unused variable 'material_3' [-Wunused-variable]
+..\src\Test.cpp:1523:10: warning: unused variable 'firstSphere' [-Wunused-variable]
+..\src\Test.cpp:1533:11: warning: variable 'transform4' set but not used [-Wunused-but-set-variable]
+..\src\Test.cpp:1586:10: warning: unused variable 'secondPlane' [-Wunused-variable]
 ..\src\Test.cpp: In function 'void onDisplay()':
-..\src\Test.cpp:1491:11: warning: variable 'm' set but not used [-Wunused-but-set-variable]
-..\src\Test.cpp:1492:11: warning: variable 'm2' set but not used [-Wunused-but-set-variable]
+..\src\Test.cpp:1635:11: warning: variable 'm' set but not used [-Wunused-but-set-variable]
+..\src\Test.cpp:1636:11: warning: variable 'm2' set but not used [-Wunused-but-set-variable]
+..\src\Test.cpp:1644:9: warning: variable 'v_3' set but not used [-Wunused-but-set-variable]
 ..\src\Test.cpp: In function 'void onIdle()':
-..\src\Test.cpp:1533:7: warning: unused variable 'time' [-Wunused-variable]
+..\src\Test.cpp:1673:7: warning: unused variable 'time' [-Wunused-variable]
 g++ "-LC:\\MinGW\\include\\GL" -o Test.exe "src\\Test.o" -lglut32 -lglu32 -lopengl32 
 
-16:57:52 Build Finished (took 2s.556ms)
+01:11:37 Build Finished (took 3s.330ms)
 

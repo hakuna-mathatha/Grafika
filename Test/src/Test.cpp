@@ -505,7 +505,7 @@ const int screenWidth = 600;	// alkalmazÃ¡s ablak felbontÃ¡sa
 const int screenHeight = 600;
 Color image[screenWidth * screenHeight];	// egy alkalmazÃ¡s ablaknyi kÃ©p
 float EPSILON = 0.001;
-int MAX_DEPTH = 5;
+int MAX_DEPTH = 3;
 float PI = 3.14159265359;
 
 //--------------------------------------------------------
@@ -878,8 +878,6 @@ public:
 		transfom = transformation;
 	}
 
-
-
 };
 
 class Ellipsoid: Intersectable {
@@ -887,11 +885,11 @@ class Ellipsoid: Intersectable {
 public:
 	static int num_of_element;
 	Vector y_axis;
-	Ellipsoid next_element;
+//	Ellipsoid next_element;
 	Ellipsoid(Material* m) {
 		y_axis = Vector(0, 1, 0, 0);
 		material = m;
-		quadric = myMatrix(4, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, -1);\
+		quadric = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1);\
 		transfom = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 
 	}
@@ -953,9 +951,42 @@ public:
 				* tr_inv_transp;
 
 		hit.normalVector.Normalize();
-		intersect_counter++;
+
+//		if (hit.intersectPoint.y < 0.35 && hit.intersectPoint.y>0.3 ) {
+////			cout << "Megvan:" << endl;
+////			hit.intersectPoint.printOut();
+//			return h;
+//
+//		}
+
+//		if(fabs(hit.intersectPoint.y - (0.2))<0.001 && fabs(hit.intersectPoint.x - (-0.15))<0.001){
+//			cout << "Megvan:" << endl;
+//			cout << "Normal:" << endl;
+//			hit.normalVector.printOut();
+////			cout << "origo:" << endl;
+////			hit.intersectPoint.printOut();
+//			return h;
+//
+//		}
+
+//		if(num_of_element<1)
 
 		return hit;
+	}
+
+	myMatrix getTheNewCoordSys(Hit intersect_point) {
+		Vector new_y_axis = intersect_point.normalVector;
+		Vector new_z_axis = y_axis % intersect_point.normalVector;
+		Vector new_x_axis = new_z_axis % new_y_axis;
+		Vector new_origo = intersect_point.intersectPoint;
+
+		myMatrix new_coord_sys = myMatrix(new_x_axis.x, new_x_axis.y,
+				new_x_axis.z, 0, new_y_axis.x, new_y_axis.y, new_y_axis.z, 0,
+				new_z_axis.x, new_z_axis.y, new_z_axis.z, 0, new_origo.x,
+				new_origo.y, new_origo.z, 1);
+
+		return new_coord_sys;
+
 	}
 
 };
@@ -1386,7 +1417,7 @@ public:
 		if (hit.t < EPSILON)
 			return ambientColor;
 
-		Color outRadiance = Color(0, 0, 0);
+		Color outRadiance = Color(0, 0, 0) + hit.material->kd * 0.3;
 
 		for (int i = 0; i < lightSources.SizeOf(); i++) {
 
@@ -1455,11 +1486,26 @@ public:
 
 };
 
+myMatrix getTheNewCoordSys(Hit intersect_point) {
+	Vector new_y_axis = intersect_point.normalVector;
+	Vector new_z_axis = Vector(0, 1, 0, 0) % intersect_point.normalVector;
+	Vector new_x_axis = new_z_axis % new_y_axis;
+	Vector new_origo = intersect_point.intersectPoint;
+
+	myMatrix new_coord_sys = myMatrix(new_x_axis.x, new_x_axis.y, new_x_axis.z,
+			0, new_y_axis.x, new_y_axis.y, new_y_axis.z, 0, new_z_axis.x,
+			new_z_axis.y, new_z_axis.z, 0, new_origo.x, new_origo.y,
+			new_origo.z, 1);
+
+	return new_coord_sys;
+
+}
+
 // Inicializacio, a program futasanak kezdeten, az OpenGL kontextus letrehozasa utan hivodik meg (ld. main() fv.)
 void onInitialization() {
 	glViewport(0, 0, screenWidth, screenHeight);
 
-	Color ks = Color(0.5, 0.5, 0.5);
+	Color ks = Color(0.4, 0.4, 0.4);
 	Color kd = Color(255, 215, 0) / 255;
 	Color k = Color(3.1, 2.7, 1.9);
 	Color k_1 = Color(1.1, 1.7, 0.9);
@@ -1478,7 +1524,7 @@ void onInitialization() {
 
 //	Ellipsoid implementation-------------------------------------------
 	Ellipsoid *firstEllipsoid = new Ellipsoid(material);
-	myMatrix transfom1 = myMatrix(0.3, 0, 0, 0, 0, 0.3, 0, 0, 0, 0, 0.3, 0, 0,
+	myMatrix transfom1 = myMatrix(0.3, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.3, 0, 0,
 			0, 0, 1);
 	myMatrix transfom3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.2, 0,
 			0.5, 1);
@@ -1486,7 +1532,38 @@ void onInitialization() {
 			-sin(M_PI / 6), cos(M_PI / 6), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 	myMatrix transform4 = myMatrix(0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0.3, 0.2,
 			1, 1);
-	firstEllipsoid->setTrasformationMatrix(transfom1 * transform4);
+
+	Vector normal = Vector(-0.529863, 0.253724, 0.80924, 1);
+	Vector origo = Vector(-0.150579, 0.20029, 0.229974, 0);
+
+	Hit hit = Hit();
+	hit.normalVector = normal;
+	hit.intersectPoint = origo;
+
+	myMatrix tr1 = myMatrix(0.15, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0.15, 0, 0, 0,
+			0, 1);
+	myMatrix tr3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.25, 0, 1);
+	myMatrix tr = getTheNewCoordSys(hit);
+
+	Ellipsoid *secondEllipsoid = new Ellipsoid(material);
+	myMatrix first_connection_matrix = tr1 * tr3 * tr;
+	firstEllipsoid->setTrasformationMatrix(transfom1);
+	secondEllipsoid->setTrasformationMatrix(first_connection_matrix);
+
+	Vector normal_2 = normal * first_connection_matrix;
+	Vector origo_2 = origo * first_connection_matrix;
+
+	hit.normalVector = normal_2;
+	hit.intersectPoint = origo_2;
+
+	tr1 = myMatrix(0.15 , 0, 0, 0, 0, 0.25 , 0, 0, 0, 0,
+			0.15 , 0, 0, 0, 0, 1);
+	tr3 = myMatrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.25 , 0,
+			1);
+	tr = getTheNewCoordSys(hit);
+	Ellipsoid *thirdEllipsoid = new Ellipsoid(material);
+	myMatrix second_connection_matrix = first_connection_matrix*tr;
+	thirdEllipsoid->setTrasformationMatrix(second_connection_matrix);
 
 //	Cylinder implementation---------------------------------------------
 	Cylinder *firstCylinder = new Cylinder(material);
@@ -1512,6 +1589,8 @@ void onInitialization() {
 //	scene.AddObject((Intersectable*) firstCylinder);
 //	scene.AddObject((Intersectable*) firstSphere);
 	scene.AddObject((Intersectable*) firstEllipsoid);
+	scene.AddObject((Intersectable*) secondEllipsoid);
+//	scene.AddObject((Intersectable*) thirdEllipsoid);
 //	scene.AddObject((Intersectable*) secondPlane);
 //	scene.AddObject((Intersectable*) firstParaboloid);
 
@@ -1522,14 +1601,12 @@ void onInitialization() {
 
 	scene.AddLight((LightSource*) light);
 
-	MyCamera camera = MyCamera(Vector(0.9, 2, 5), Vector(0, 0, 0),
+	MyCamera camera = MyCamera(Vector(1, 2, 3), Vector(0, 0, 0),
 			Vector(0, 1, 0));
 
 	scene.SetCamera(camera);
 
 	scene.render();
-
-	cout << "intersect counter:" << intersect_counter << endl;
 
 }
 
@@ -1562,13 +1639,9 @@ void onDisplay() {
 			1);
 	transfom.printM();
 	myMatrix tr_in = transfom.inverse();
-	cout << endl;
-	tr_in.printM();
 
 //	Vector v_2 = matrix_vector_multi(m, v);
-	cout << endl;
 	Vector v_3 = matrix_vector_multi(tr_in, v);
-	v_3.printOut();
 
 }
 
